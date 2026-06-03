@@ -15,21 +15,20 @@ pub(crate) const APP_NAME: &str = "docs-rs-mcp";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let subscriber = tracing_subscriber::registry()
-        .with(fmt::layer().compact())
-        .with(
+    tracing_subscriber::fmt()
+        .compact()
+        .with_env_filter(
             EnvFilter::builder()
                 .with_default_directive(LevelFilter::INFO.into())
                 .from_env_lossy(),
-        );
-
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+        )
+        .init();
 
     let config = Config::new()?;
-    let path = fetch_rustdoc_json(&config, "itertools", None).await?;
+    let path = fetch_rustdoc_json(&config, "axum", None).await?;
     dbg!(&path);
 
-    // info!("Starting MCP server");
+    info!("Starting MCP server");
 
     // let service = Counter::new().serve(stdio()).await.inspect_err(|e| {
     //     error!(?e, "serving error");
