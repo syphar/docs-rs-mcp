@@ -39,6 +39,8 @@ async fn fetch_rustdoc_json(
     krate: &str,
     req_version: Option<&str>,
 ) -> Result<PathBuf> {
+    // FIXME: the cached file has to use the actual lastet version,
+    // otherwise I would never download new release.
     let req_version = req_version.unwrap_or("latest");
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
