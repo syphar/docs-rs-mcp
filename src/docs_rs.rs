@@ -1,4 +1,5 @@
 use anyhow::Result;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -7,12 +8,15 @@ pub(crate) struct Status {
     pub(crate) version: semver::Version,
 }
 
-pub(crate) async fn get_docs_status(krate: &str, req_version: &str) -> Result<Status> {
-    Ok(reqwest::get(&format!(
+pub(crate) async fn get_docs_status(krate: &str, req_version: &str) -> Result<Option<Status>> {
+    let response = reqwest::get(&format!(
         "https://docs.rs/crate/{krate}/{req_version}/status.json"
     ))
-    .await?
-    .error_for_status()?
-    .json()
-    .await?)
+    .await?;
+
+    if response.status() == StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+
+    Ok(Some(response.error_for_status()?.json().await?))
 }

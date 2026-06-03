@@ -37,10 +37,12 @@ impl DocsServer {
     ) -> Result<CallToolResult, McpError> {
         let status = get_docs_status(&args.krate, &args.req.unwrap_or_else(|| "latest".into()))
             .await
-            .unwrap();
+            .map_err(|err| McpError::internal_error(err.to_string(), None))?
+            .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;
 
         Ok(CallToolResult::structured(
-            serde_json::to_value(&status).unwrap(),
+            serde_json::to_value(&status)
+                .map_err(|err| McpError::internal_error(err.to_string(), None))?,
         ))
     }
 }
