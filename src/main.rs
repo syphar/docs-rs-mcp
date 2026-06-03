@@ -5,7 +5,7 @@ use std::io;
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{self, EnvFilter, fmt, layer::SubscriberExt as _};
 
-use crate::{config::Config, rustdoc_json::fetch_rustdoc_json};
+use crate::{config::Config, rustdoc_json::get_docs};
 
 mod config;
 mod counter;
@@ -24,11 +24,12 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config = Config::new()?;
-    let path = fetch_rustdoc_json(&config, "axum", None).await?;
-    dbg!(&path);
+    let krate = std::env::args().skip(1).next().unwrap();
 
-    info!("Starting MCP server");
+    let config = Config::new()?;
+
+    let krate = get_docs(&config, &krate, None).await?;
+    // dbg!(&krate);
 
     // let service = Counter::new().serve(stdio()).await.inspect_err(|e| {
     //     error!(?e, "serving error");

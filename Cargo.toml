@@ -20,6 +20,7 @@ rmcp = { version = "1.7.0", features = [
     "transport-io",
     "transport-streamable-http-server",
 ] }
+# FIXME: do we need different versions of rustdoc-types for different format-version
 rustdoc-types = "0.57.3"
 semver = "1.0.28"
 serde = "1.0.228"

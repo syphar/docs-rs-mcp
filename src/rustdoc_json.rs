@@ -10,8 +10,10 @@ use std::{
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
+    task::spawn_blocking,
 };
 use tokio_util::io::StreamReader;
+use tracing::debug;
 
 fn build_download_url(krate: &str, req_version: &str) -> Result<Url> {
     Ok(Url::parse(&format!(
@@ -32,7 +34,7 @@ fn dir_for_crate(output_path: &Path, name: &str) -> PathBuf {
     path
 }
 
-pub(crate) async fn fetch_rustdoc_json(
+async fn fetch_rustdoc_json(
     config: &Config,
     krate: &str,
     req_version: Option<&str>,
@@ -43,15 +45,36 @@ pub(crate) async fn fetch_rustdoc_json(
     let target_path = target_dir.join(req_version).with_extension("json");
 
     if fs::try_exists(&target_path).await? {
+        debug!(target_path = %target_path.display(), "found rustdoc json");
         return Ok(target_path);
     }
 
     fs::create_dir_all(&target_dir).await?;
     let url = build_download_url(krate, req_version)?;
 
+    debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
+
     download_zstd_to_file(url, &target_path).await?;
 
     Ok(target_path)
+}
+
+pub(crate) async fn get_docs(
+    config: &Config,
+    krate: &str,
+    req_version: Option<&str>,
+) -> Result<rustdoc_types::Crate> {
+    let path = fetch_rustdoc_json(config, krate, req_version).await?;
+
+    let krate = spawn_blocking(move || {
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+
+        Ok::<_, anyhow::Error>(serde_json::from_reader(reader)?)
+    })
+    .await??;
+
+    Ok(krate)
 }
 
 async fn download_zstd_to_file(url: Url, target_path: &Path) -> Result<()> {
