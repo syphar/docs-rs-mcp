@@ -37,14 +37,12 @@ fn dir_for_crate(output_path: &Path, name: &str) -> PathBuf {
 async fn fetch_rustdoc_json(
     config: &Config,
     krate: &str,
-    req_version: Option<&str>,
+    version: &semver::Version,
 ) -> Result<PathBuf> {
-    // FIXME: the cached file has to use the actual lastet version,
-    // otherwise I would never download new release.
-    let req_version = req_version.unwrap_or("latest");
+    let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
-    let target_path = target_dir.join(req_version).with_extension("json");
+    let target_path = target_dir.join(&version).with_extension("json");
 
     if fs::try_exists(&target_path).await? {
         debug!(target_path = %target_path.display(), "found rustdoc json");
@@ -52,7 +50,7 @@ async fn fetch_rustdoc_json(
     }
 
     fs::create_dir_all(&target_dir).await?;
-    let url = build_download_url(krate, req_version)?;
+    let url = build_download_url(krate, &version)?;
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 
@@ -64,9 +62,9 @@ async fn fetch_rustdoc_json(
 pub(crate) async fn get_docs(
     config: &Config,
     krate: &str,
-    req_version: Option<&str>,
+    version: &semver::Version,
 ) -> Result<rustdoc_types::Crate> {
-    let path = fetch_rustdoc_json(config, krate, req_version).await?;
+    let path = fetch_rustdoc_json(config, krate, version).await?;
 
     let krate = spawn_blocking(move || {
         let file = std::fs::File::open(&path)?;
