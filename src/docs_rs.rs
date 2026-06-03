@@ -1,7 +1,7 @@
 use anyhow::Result;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub(crate) struct Status {
     pub(crate) doc_status: bool,
     pub(crate) version: semver::Version,
