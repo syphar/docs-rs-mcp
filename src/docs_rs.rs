@@ -14,7 +14,7 @@ pub(crate) async fn get_docs_status(
     req_version: &semver::VersionReq,
 ) -> Result<Option<Status>> {
     let response = CLIENT
-        .get(&format!(
+        .get(format!(
             "https://docs.rs/crate/{krate}/{req_version}/status.json"
         ))
         .send()

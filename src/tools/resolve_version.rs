@@ -19,9 +19,7 @@ pub(crate) async fn handle(args: ResolveVersionArgs) -> Result<CallToolResult, M
             .map_err(|err: semver::Error| {
                 McpError::invalid_params(
                     format!("invalid semver version requirement: {}", err),
-                    args.req
-                        .as_ref()
-                        .map(|val| serde_json::to_value(val).unwrap()),
+                    Some(serde_json::json!({ "req": args.req })),
                 )
             })?;
 

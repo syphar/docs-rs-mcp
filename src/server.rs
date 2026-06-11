@@ -13,6 +13,7 @@ use rmcp::{
 };
 
 pub struct DocsServer {
+    #[allow(dead_code)]
     tool_router: ToolRouter<DocsServer>,
     config: Config,
 }

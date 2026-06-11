@@ -82,9 +82,7 @@ pub(crate) async fn get_docs(
 async fn download_zstd_to_file(url: Url, target_path: &Path) -> Result<()> {
     let response = CLIENT.get(url).send().await?.error_for_status()?;
 
-    let stream = response
-        .bytes_stream()
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err));
+    let stream = response.bytes_stream().map_err(io::Error::other);
 
     let reader = StreamReader::new(stream);
     let mut decoder = ZstdDecoder::new(reader);
