@@ -1,6 +1,9 @@
 use crate::{
     config::Config,
-    tools::resolve_version::{self, ResolveVersionArgs},
+    tools::{
+        resolve_version::{self, ResolveVersionArgs},
+        search_items::{self, SearchItemsArgs},
+    },
 };
 use rmcp::{
     ErrorData as McpError, ServerHandler,
@@ -31,6 +34,16 @@ impl DocsServer {
         Parameters(args): Parameters<ResolveVersionArgs>,
     ) -> Result<CallToolResult, McpError> {
         resolve_version::handle(args).await
+    }
+
+    #[tool(
+        description = "Search rustdoc items for a crate version by name or path, optionally filtering by item kind."
+    )]
+    async fn search_items(
+        &self,
+        Parameters(args): Parameters<SearchItemsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        search_items::handle(&self.config, args).await
     }
 }
 
