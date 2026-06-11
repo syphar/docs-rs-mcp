@@ -1,6 +1,50 @@
 use crate::{config::Config, rustdoc_json::get_docs};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
+use rustdoc_types::ItemKind;
 use serde::Serialize;
+use std::{collections::HashMap, sync::LazyLock};
+
+static ITEM_KIND_NAMES: LazyLock<HashMap<ItemKind, String>> = LazyLock::new(|| {
+    ALL_ITEM_KINDS
+        .iter()
+        .map(|kind| {
+            let name = serde_json::to_value(kind)
+                .expect("ItemKind serialization should not fail")
+                .as_str()
+                .expect("ItemKind should serialize as a string")
+                .to_string();
+
+            (*kind, name)
+        })
+        .collect()
+});
+
+static ALL_ITEM_KINDS: &[ItemKind] = &[
+    ItemKind::Module,
+    ItemKind::ExternCrate,
+    ItemKind::Use,
+    ItemKind::Struct,
+    ItemKind::StructField,
+    ItemKind::Union,
+    ItemKind::Enum,
+    ItemKind::Variant,
+    ItemKind::Function,
+    ItemKind::TypeAlias,
+    ItemKind::Constant,
+    ItemKind::Trait,
+    ItemKind::TraitAlias,
+    ItemKind::Impl,
+    ItemKind::Static,
+    ItemKind::ExternType,
+    ItemKind::Macro,
+    ItemKind::ProcAttribute,
+    ItemKind::ProcDerive,
+    ItemKind::AssocConst,
+    ItemKind::AssocType,
+    ItemKind::Primitive,
+    ItemKind::Keyword,
+    ItemKind::Attribute,
+];
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
@@ -56,8 +100,7 @@ pub(crate) async fn handle(
         .index
         .values()
         .filter_map(|item| {
-            let kind = serde_json::to_value(item.inner.item_kind()).ok()?;
-            let kind = kind.as_str()?;
+            let kind = item_kind_name(item.inner.item_kind())?;
             if kind_filter.as_deref().is_some_and(|filter| filter != kind) {
                 return None;
             }
@@ -100,4 +143,8 @@ fn normalize_kind(kind: &str) -> String {
         "mod" => "module".to_string(),
         _ => kind,
     }
+}
+
+fn item_kind_name(kind: ItemKind) -> Option<&'static str> {
+    ITEM_KIND_NAMES.get(&kind).map(String::as_str)
 }
