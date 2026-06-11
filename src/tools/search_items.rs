@@ -1,4 +1,4 @@
-use crate::{config::Config, rustdoc_json::get_docs};
+use crate::{config::Config, rustdoc_json::get_docs, semver_types::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use rustdoc_types::{Id, ItemKind};
 use serde::Serialize;
@@ -8,7 +8,7 @@ pub(crate) struct SearchItemsArgs {
     /// Name of the crate on crates.io / docs.rs.
     pub(crate) krate: String,
     /// Concrete crate version to load rustdoc JSON for.
-    pub(crate) version: String,
+    pub(crate) version: Version,
     /// Search text matched against item names and paths.
     pub(crate) query: String,
     /// Optional item kind filter, e.g. "struct", "enum", "trait", "function", "module".
@@ -143,16 +143,9 @@ pub(crate) async fn handle(
     config: &Config,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
-    let version = args.version.parse().map_err(|err: semver::Error| {
-        McpError::invalid_params(
-            format!("invalid semver version: {}", err),
-            Some(serde_json::json!({ "version": args.version })),
-        )
-    })?;
-
     let kind_filter = args.kind;
     let query = args.query.to_lowercase();
-    let docs = get_docs(config, &args.krate, &version)
+    let docs = get_docs(config, &args.krate, args.version.as_ref())
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 

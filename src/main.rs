@@ -9,6 +9,7 @@ mod client;
 mod config;
 mod docs_rs;
 mod rustdoc_json;
+mod semver_types;
 mod server;
 mod tools;
 
