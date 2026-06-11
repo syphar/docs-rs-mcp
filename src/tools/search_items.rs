@@ -13,7 +13,7 @@ pub(crate) struct SearchItemsArgs {
     pub(crate) query: String,
     /// Optional item kind filter, e.g. "struct", "enum", "trait", "function", "module".
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) kind: Option<String>,
+    pub(crate) kind: Option<SearchItemKind>,
     /// Maximum number of matches to return. Defaults to 20.
     #[serde(default = "default_limit")]
     pub(crate) limit: usize,
@@ -21,6 +21,67 @@ pub(crate) struct SearchItemsArgs {
 
 fn default_limit() -> usize {
     20
+}
+
+#[derive(Debug, Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[schemars(rename_all = "snake_case")]
+pub(crate) enum SearchItemKind {
+    Module,
+    ExternCrate,
+    Use,
+    Struct,
+    StructField,
+    Union,
+    Enum,
+    Variant,
+    Function,
+    TypeAlias,
+    Constant,
+    Trait,
+    TraitAlias,
+    Impl,
+    Static,
+    ExternType,
+    Macro,
+    ProcAttribute,
+    ProcDerive,
+    AssocConst,
+    AssocType,
+    Primitive,
+    Keyword,
+    Attribute,
+}
+
+impl From<SearchItemKind> for ItemKind {
+    fn from(kind: SearchItemKind) -> Self {
+        match kind {
+            SearchItemKind::Module => ItemKind::Module,
+            SearchItemKind::ExternCrate => ItemKind::ExternCrate,
+            SearchItemKind::Use => ItemKind::Use,
+            SearchItemKind::Struct => ItemKind::Struct,
+            SearchItemKind::StructField => ItemKind::StructField,
+            SearchItemKind::Union => ItemKind::Union,
+            SearchItemKind::Enum => ItemKind::Enum,
+            SearchItemKind::Variant => ItemKind::Variant,
+            SearchItemKind::Function => ItemKind::Function,
+            SearchItemKind::TypeAlias => ItemKind::TypeAlias,
+            SearchItemKind::Constant => ItemKind::Constant,
+            SearchItemKind::Trait => ItemKind::Trait,
+            SearchItemKind::TraitAlias => ItemKind::TraitAlias,
+            SearchItemKind::Impl => ItemKind::Impl,
+            SearchItemKind::Static => ItemKind::Static,
+            SearchItemKind::ExternType => ItemKind::ExternType,
+            SearchItemKind::Macro => ItemKind::Macro,
+            SearchItemKind::ProcAttribute => ItemKind::ProcAttribute,
+            SearchItemKind::ProcDerive => ItemKind::ProcDerive,
+            SearchItemKind::AssocConst => ItemKind::AssocConst,
+            SearchItemKind::AssocType => ItemKind::AssocType,
+            SearchItemKind::Primitive => ItemKind::Primitive,
+            SearchItemKind::Keyword => ItemKind::Keyword,
+            SearchItemKind::Attribute => ItemKind::Attribute,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -47,7 +108,7 @@ pub(crate) async fn handle(
         )
     })?;
 
-    let kind_filter = args.kind.as_deref().map(parse_item_kind).transpose()?;
+    let kind_filter = args.kind.map(ItemKind::from);
     let query = args.query.to_lowercase();
     let docs = get_docs(config, &args.krate, &version)
         .await
@@ -91,18 +152,6 @@ pub(crate) async fn handle(
         serde_json::to_value(SearchItemsResult { items: matches })
             .map_err(|err| McpError::internal_error(err.to_string(), None))?,
     ))
-}
-
-fn parse_item_kind(kind: &str) -> Result<ItemKind, McpError> {
-    let kind = kind.to_ascii_lowercase();
-    let kind = match kind.as_str() {
-        "fn" => "function",
-        "mod" => "module",
-        _ => &kind,
-    };
-
-    serde_json::from_value(serde_json::Value::String(kind.to_string()))
-        .map_err(|err| McpError::invalid_params(format!("invalid item kind: {}", err), None))
 }
 
 fn serialize_item_kind(kind: ItemKind) -> Result<String, serde_json::Error> {
