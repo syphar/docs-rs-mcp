@@ -3,7 +3,7 @@ use rmcp::{ServiceExt, transport::stdio};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_subscriber::{self, EnvFilter};
 
-use crate::server::DocsServer;
+use crate::{config::Config, server::DocsServer};
 
 mod client;
 mod config;
@@ -25,9 +25,14 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let service = DocsServer::new().serve(stdio()).await.inspect_err(|e| {
-        error!(?e, "serving error");
-    })?;
+    let config = Config::new()?;
+
+    let service = DocsServer::new(config)
+        .serve(stdio())
+        .await
+        .inspect_err(|e| {
+            error!(?e, "serving error");
+        })?;
 
     service.waiting().await?;
     Ok(())

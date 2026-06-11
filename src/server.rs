@@ -1,4 +1,7 @@
-use crate::tools::resolve_version::{self, ResolveVersionArgs};
+use crate::{
+    config::Config,
+    tools::resolve_version::{self, ResolveVersionArgs},
+};
 use rmcp::{
     ErrorData as McpError, ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
@@ -6,16 +9,17 @@ use rmcp::{
     tool, tool_handler, tool_router,
 };
 
-#[derive(Clone)]
 pub struct DocsServer {
     tool_router: ToolRouter<DocsServer>,
+    config: Config,
 }
 
 #[tool_router]
 impl DocsServer {
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Self {
             tool_router: Self::tool_router(),
+            config,
         }
     }
 
