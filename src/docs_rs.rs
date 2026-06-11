@@ -1,3 +1,4 @@
+use crate::client::CLIENT;
 use anyhow::Result;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -9,10 +10,12 @@ pub(crate) struct Status {
 }
 
 pub(crate) async fn get_docs_status(krate: &str, req_version: &str) -> Result<Option<Status>> {
-    let response = reqwest::get(&format!(
-        "https://docs.rs/crate/{krate}/{req_version}/status.json"
-    ))
-    .await?;
+    let response = CLIENT
+        .get(&format!(
+            "https://docs.rs/crate/{krate}/{req_version}/status.json"
+        ))
+        .send()
+        .await?;
 
     if response.status() == StatusCode::NOT_FOUND {
         return Ok(None);

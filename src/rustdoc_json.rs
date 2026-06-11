@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{client::CLIENT, config::Config};
 use anyhow::Result;
 use async_compression::tokio::bufread::ZstdDecoder;
 use futures_util::TryStreamExt;
@@ -15,12 +15,14 @@ use tokio::{
 use tokio_util::io::StreamReader;
 use tracing::debug;
 
-fn build_download_url(krate: &str, req_version: &str) -> Result<Url> {
+fn build_download_url(krate: &str, version: &str) -> Result<Url> {
     Ok(Url::parse(&format!(
-        "https://docs.rs/crate/{krate}/{req_version}/json.zst"
+        "https://docs.rs/crate/{krate}/{version}/json.zst"
     ))?)
 }
 
+/// standard method for crates.io index to get the folder for a crate,
+/// given a crate name.
 fn dir_for_crate(output_path: &Path, name: &str) -> PathBuf {
     let mut path = output_path.to_owned();
     let name_lower = name.to_ascii_lowercase();
@@ -78,7 +80,7 @@ pub(crate) async fn get_docs(
 }
 
 async fn download_zstd_to_file(url: Url, target_path: &Path) -> Result<()> {
-    let response = reqwest::get(url).await?.error_for_status()?;
+    let response = CLIENT.get(url).send().await?.error_for_status()?;
 
     let stream = response
         .bytes_stream()

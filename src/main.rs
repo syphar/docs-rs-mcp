@@ -5,13 +5,13 @@ use tracing_subscriber::{self, EnvFilter};
 
 use crate::server::DocsServer;
 
+mod client;
 mod config;
-mod counter;
 mod docs_rs;
 mod rustdoc_json;
 mod server;
 
-pub(crate) const APP_NAME: &str = "docs-rs-mcp";
+pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 
 #[tokio::main]
 async fn main() -> Result<()> {
