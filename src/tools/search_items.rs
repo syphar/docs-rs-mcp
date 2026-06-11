@@ -23,7 +23,18 @@ fn default_limit() -> usize {
     20
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 #[schemars(rename_all = "snake_case")]
 pub(crate) enum SearchItemKind {
@@ -80,6 +91,37 @@ impl From<SearchItemKind> for ItemKind {
             SearchItemKind::Primitive => ItemKind::Primitive,
             SearchItemKind::Keyword => ItemKind::Keyword,
             SearchItemKind::Attribute => ItemKind::Attribute,
+        }
+    }
+}
+
+impl From<ItemKind> for SearchItemKind {
+    fn from(kind: ItemKind) -> Self {
+        match kind {
+            ItemKind::Module => SearchItemKind::Module,
+            ItemKind::ExternCrate => SearchItemKind::ExternCrate,
+            ItemKind::Use => SearchItemKind::Use,
+            ItemKind::Struct => SearchItemKind::Struct,
+            ItemKind::StructField => SearchItemKind::StructField,
+            ItemKind::Union => SearchItemKind::Union,
+            ItemKind::Enum => SearchItemKind::Enum,
+            ItemKind::Variant => SearchItemKind::Variant,
+            ItemKind::Function => SearchItemKind::Function,
+            ItemKind::TypeAlias => SearchItemKind::TypeAlias,
+            ItemKind::Constant => SearchItemKind::Constant,
+            ItemKind::Trait => SearchItemKind::Trait,
+            ItemKind::TraitAlias => SearchItemKind::TraitAlias,
+            ItemKind::Impl => SearchItemKind::Impl,
+            ItemKind::Static => SearchItemKind::Static,
+            ItemKind::ExternType => SearchItemKind::ExternType,
+            ItemKind::Macro => SearchItemKind::Macro,
+            ItemKind::ProcAttribute => SearchItemKind::ProcAttribute,
+            ItemKind::ProcDerive => SearchItemKind::ProcDerive,
+            ItemKind::AssocConst => SearchItemKind::AssocConst,
+            ItemKind::AssocType => SearchItemKind::AssocType,
+            ItemKind::Primitive => SearchItemKind::Primitive,
+            ItemKind::Keyword => SearchItemKind::Keyword,
+            ItemKind::Attribute => SearchItemKind::Attribute,
         }
     }
 }
@@ -143,7 +185,7 @@ pub(crate) async fn handle(
     matches.sort_by(|left, right| {
         left.path
             .cmp(&right.path)
-            .then_with(|| left.kind.cmp(&right.kind.into()))
+            .then_with(|| left.kind.cmp(&right.kind))
             .then_with(|| left.id.cmp(&right.id))
     });
     matches.truncate(args.limit);
@@ -152,11 +194,4 @@ pub(crate) async fn handle(
         serde_json::to_value(SearchItemsResult { items: matches })
             .map_err(|err| McpError::internal_error(err.to_string(), None))?,
     ))
-}
-
-fn serialize_item_kind(kind: ItemKind) -> Result<String, serde_json::Error> {
-    Ok(serde_json::to_value(kind)?
-        .as_str()
-        .expect("ItemKind should serialize as a string")
-        .to_string())
 }
