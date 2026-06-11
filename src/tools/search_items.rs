@@ -2,49 +2,6 @@ use crate::{config::Config, rustdoc_json::get_docs};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use rustdoc_types::ItemKind;
 use serde::Serialize;
-use std::{collections::HashMap, sync::LazyLock};
-
-static ITEM_KIND_NAMES: LazyLock<HashMap<ItemKind, String>> = LazyLock::new(|| {
-    ALL_ITEM_KINDS
-        .iter()
-        .map(|kind| {
-            let name = serde_json::to_value(kind)
-                .expect("ItemKind serialization should not fail")
-                .as_str()
-                .expect("ItemKind should serialize as a string")
-                .to_string();
-
-            (*kind, name)
-        })
-        .collect()
-});
-
-static ALL_ITEM_KINDS: &[ItemKind] = &[
-    ItemKind::Module,
-    ItemKind::ExternCrate,
-    ItemKind::Use,
-    ItemKind::Struct,
-    ItemKind::StructField,
-    ItemKind::Union,
-    ItemKind::Enum,
-    ItemKind::Variant,
-    ItemKind::Function,
-    ItemKind::TypeAlias,
-    ItemKind::Constant,
-    ItemKind::Trait,
-    ItemKind::TraitAlias,
-    ItemKind::Impl,
-    ItemKind::Static,
-    ItemKind::ExternType,
-    ItemKind::Macro,
-    ItemKind::ProcAttribute,
-    ItemKind::ProcDerive,
-    ItemKind::AssocConst,
-    ItemKind::AssocType,
-    ItemKind::Primitive,
-    ItemKind::Keyword,
-    ItemKind::Attribute,
-];
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
@@ -90,7 +47,7 @@ pub(crate) async fn handle(
         )
     })?;
 
-    let kind_filter = args.kind.as_deref().map(normalize_kind);
+    let kind_filter = args.kind.as_deref().map(parse_item_kind).transpose()?;
     let query = args.query.to_lowercase();
     let docs = get_docs(config, &args.krate, &version)
         .await
@@ -100,8 +57,8 @@ pub(crate) async fn handle(
         .index
         .values()
         .filter_map(|item| {
-            let kind = item_kind_name(item.inner.item_kind())?;
-            if kind_filter.as_deref().is_some_and(|filter| filter != kind) {
+            let kind = item.inner.item_kind();
+            if kind_filter.is_some_and(|filter| filter != kind) {
                 return None;
             }
 
@@ -117,7 +74,7 @@ pub(crate) async fn handle(
                 id: item.id.0.to_string(),
                 name,
                 path,
-                kind: kind.to_string(),
+                kind: serialize_item_kind(kind).ok()?,
             })
         })
         .collect::<Vec<_>>();
@@ -136,15 +93,21 @@ pub(crate) async fn handle(
     ))
 }
 
-fn normalize_kind(kind: &str) -> String {
+fn parse_item_kind(kind: &str) -> Result<ItemKind, McpError> {
     let kind = kind.to_ascii_lowercase();
-    match kind.as_str() {
-        "fn" => "function".to_string(),
-        "mod" => "module".to_string(),
-        _ => kind,
-    }
+    let kind = match kind.as_str() {
+        "fn" => "function",
+        "mod" => "module",
+        _ => &kind,
+    };
+
+    serde_json::from_value(serde_json::Value::String(kind.to_string()))
+        .map_err(|err| McpError::invalid_params(format!("invalid item kind: {}", err), None))
 }
 
-fn item_kind_name(kind: ItemKind) -> Option<&'static str> {
-    ITEM_KIND_NAMES.get(&kind).map(String::as_str)
+fn serialize_item_kind(kind: ItemKind) -> Result<String, serde_json::Error> {
+    Ok(serde_json::to_value(kind)?
+        .as_str()
+        .expect("ItemKind should serialize as a string")
+        .to_string())
 }
