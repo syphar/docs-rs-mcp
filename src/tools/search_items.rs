@@ -1,6 +1,6 @@
 use crate::{config::Config, rustdoc_json::get_docs};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
-use rustdoc_types::ItemKind;
+use rustdoc_types::{Id, ItemKind};
 use serde::Serialize;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -23,7 +23,7 @@ fn default_limit() -> usize {
     20
 }
 
-#[derive(Debug, Clone, Copy, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[schemars(rename_all = "snake_case")]
 pub(crate) enum SearchItemKind {
@@ -91,10 +91,10 @@ struct SearchItemsResult {
 
 #[derive(Debug, Serialize)]
 struct SearchItemMatch {
-    id: String,
+    id: Id,
     name: String,
     path: String,
-    kind: String,
+    kind: SearchItemKind,
 }
 
 pub(crate) async fn handle(
@@ -108,7 +108,7 @@ pub(crate) async fn handle(
         )
     })?;
 
-    let kind_filter = args.kind.map(ItemKind::from);
+    let kind_filter = args.kind;
     let query = args.query.to_lowercase();
     let docs = get_docs(config, &args.krate, &version)
         .await
@@ -118,7 +118,7 @@ pub(crate) async fn handle(
         .index
         .values()
         .filter_map(|item| {
-            let kind = item.inner.item_kind();
+            let kind: SearchItemKind = item.inner.item_kind().into();
             if kind_filter.is_some_and(|filter| filter != kind) {
                 return None;
             }
@@ -132,10 +132,10 @@ pub(crate) async fn handle(
             let haystack = format!("{name} {path}").to_lowercase();
 
             haystack.contains(&query).then_some(SearchItemMatch {
-                id: item.id.0.to_string(),
+                id: item.id,
                 name,
                 path,
-                kind: serialize_item_kind(kind).ok()?,
+                kind,
             })
         })
         .collect::<Vec<_>>();
@@ -143,7 +143,7 @@ pub(crate) async fn handle(
     matches.sort_by(|left, right| {
         left.path
             .cmp(&right.path)
-            .then_with(|| left.kind.cmp(&right.kind))
+            .then_with(|| left.kind.cmp(&right.kind.into()))
             .then_with(|| left.id.cmp(&right.id))
     });
     matches.truncate(args.limit);
