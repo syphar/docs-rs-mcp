@@ -9,7 +9,10 @@ pub(crate) struct Status {
     pub(crate) version: semver::Version,
 }
 
-pub(crate) async fn get_docs_status(krate: &str, req_version: &str) -> Result<Option<Status>> {
+pub(crate) async fn get_docs_status(
+    krate: &str,
+    req_version: &semver::VersionReq,
+) -> Result<Option<Status>> {
     let response = CLIENT
         .get(&format!(
             "https://docs.rs/crate/{krate}/{req_version}/status.json"

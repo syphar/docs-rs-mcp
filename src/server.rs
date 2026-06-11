@@ -6,11 +6,14 @@ use rmcp::{
     schemars, tool, tool_handler, tool_router,
 };
 
+// TODO:
+// * newtype around VersionReq to implement JsonSchema?
+
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ResolveVersionArgs {
     /// Name of the crate on crates.io / docs.rs.
     pub krate: String,
-    /// Semver requirement (e.g. "1", "^1.5", "0.14.0") or "latest". Defaults to "latest".
+    /// Semver requirement (e.g. "1", "^1.5", "0.14.0") or "*". Defaults to "*".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub req: Option<String>,
 }
@@ -35,7 +38,19 @@ impl DocsServer {
         &self,
         Parameters(args): Parameters<ResolveVersionArgs>,
     ) -> Result<CallToolResult, McpError> {
-        let status = get_docs_status(&args.krate, &args.req.unwrap_or_else(|| "latest".into()))
+        let version_req: semver::VersionReq =
+            args.req
+                .as_deref()
+                .unwrap_or("*")
+                .parse()
+                .map_err(|err: semver::Error| {
+                    McpError::invalid_params(
+                        format!("invalid semver version requirement: {}", err),
+                        args.req.map(|val| serde_json::to_value(val).unwrap()),
+                    )
+                })?;
+
+        let status = get_docs_status(&args.krate, &version_req)
             .await
             .map_err(|err| McpError::internal_error(err.to_string(), None))?
             .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;
