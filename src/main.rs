@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config = Config::new()?;
+    let config = Config::from_env()?;
 
     let service = DocsServer::new(config)
         .serve(stdio())

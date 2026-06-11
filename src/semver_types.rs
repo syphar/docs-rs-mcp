@@ -33,6 +33,12 @@ impl From<Version> for semver::Version {
 #[schemars(transparent)]
 pub(crate) struct VersionReq(#[schemars(with = "String")] semver::VersionReq);
 
+impl VersionReq {
+    pub fn parse(text: &str) -> Result<Self, semver::Error> {
+        semver::VersionReq::parse(text).map(Self)
+    }
+}
+
 impl Default for VersionReq {
     fn default() -> Self {
         Self(semver::VersionReq::STAR)

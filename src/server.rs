@@ -34,7 +34,7 @@ impl DocsServer {
         &self,
         Parameters(args): Parameters<ResolveVersionArgs>,
     ) -> Result<CallToolResult, McpError> {
-        resolve_version::handle(args).await
+        resolve_version::handle(&self.config, args).await
     }
 
     #[tool(

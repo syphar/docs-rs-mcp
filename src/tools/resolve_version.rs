@@ -1,4 +1,4 @@
-use crate::{docs_rs::get_docs_status, semver_types::VersionReq};
+use crate::{config::Config, docs_rs::get_docs_status, semver_types::VersionReq};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -10,8 +10,11 @@ pub(crate) struct ResolveVersionArgs {
     pub(crate) req: VersionReq,
 }
 
-pub(crate) async fn handle(args: ResolveVersionArgs) -> Result<CallToolResult, McpError> {
-    let status = get_docs_status(&args.krate, args.req.as_ref())
+pub(crate) async fn handle(
+    config: &Config,
+    args: ResolveVersionArgs,
+) -> Result<CallToolResult, McpError> {
+    let status = get_docs_status(config, &args.krate, args.req.as_ref())
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
         .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;
