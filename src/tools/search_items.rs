@@ -1,6 +1,5 @@
 use crate::{config::Config, rustdoc_json::get_docs};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
-use rustdoc_types::ItemKind;
 use serde::Serialize;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -33,7 +32,7 @@ struct SearchItemMatch {
     id: String,
     name: String,
     path: String,
-    kind: &'static str,
+    kind: String,
 }
 
 pub(crate) async fn handle(
@@ -57,7 +56,8 @@ pub(crate) async fn handle(
         .index
         .values()
         .filter_map(|item| {
-            let kind = kind_name(item.inner.item_kind());
+            let kind = serde_json::to_value(item.inner.item_kind()).ok()?;
+            let kind = kind.as_str()?;
             if kind_filter.as_deref().is_some_and(|filter| filter != kind) {
                 return None;
             }
@@ -74,7 +74,7 @@ pub(crate) async fn handle(
                 id: item.id.0.to_string(),
                 name,
                 path,
-                kind,
+                kind: kind.to_string(),
             })
         })
         .collect::<Vec<_>>();
@@ -82,7 +82,7 @@ pub(crate) async fn handle(
     matches.sort_by(|left, right| {
         left.path
             .cmp(&right.path)
-            .then_with(|| left.kind.cmp(right.kind))
+            .then_with(|| left.kind.cmp(&right.kind))
             .then_with(|| left.id.cmp(&right.id))
     });
     matches.truncate(args.limit);
@@ -99,34 +99,5 @@ fn normalize_kind(kind: &str) -> String {
         "fn" => "function".to_string(),
         "mod" => "module".to_string(),
         _ => kind,
-    }
-}
-
-fn kind_name(kind: ItemKind) -> &'static str {
-    match kind {
-        ItemKind::Module => "module",
-        ItemKind::ExternCrate => "extern_crate",
-        ItemKind::Use => "use",
-        ItemKind::Struct => "struct",
-        ItemKind::StructField => "struct_field",
-        ItemKind::Union => "union",
-        ItemKind::Enum => "enum",
-        ItemKind::Variant => "variant",
-        ItemKind::Function => "function",
-        ItemKind::TypeAlias => "type_alias",
-        ItemKind::Constant => "constant",
-        ItemKind::Trait => "trait",
-        ItemKind::TraitAlias => "trait_alias",
-        ItemKind::Impl => "impl",
-        ItemKind::Static => "static",
-        ItemKind::ExternType => "extern_type",
-        ItemKind::Macro => "macro",
-        ItemKind::ProcAttribute => "proc_attribute",
-        ItemKind::ProcDerive => "proc_derive",
-        ItemKind::AssocConst => "assoc_const",
-        ItemKind::AssocType => "assoc_type",
-        ItemKind::Primitive => "primitive",
-        ItemKind::Keyword => "keyword",
-        ItemKind::Attribute => "attribute",
     }
 }
