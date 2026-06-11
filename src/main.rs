@@ -10,6 +10,7 @@ mod config;
 mod docs_rs;
 mod rustdoc_json;
 mod server;
+mod tools;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 
