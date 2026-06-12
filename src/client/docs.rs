@@ -15,10 +15,8 @@ use tokio::{
 use tokio_util::io::StreamReader;
 use tracing::debug;
 
-fn build_download_url(krate: &str, version: &str) -> Result<Url> {
-    Ok(Url::parse(&format!(
-        "https://docs.rs/crate/{krate}/{version}/json.zst"
-    ))?)
+fn build_download_url(base: &Url, krate: &str, version: &str) -> Result<Url> {
+    Ok(base.join(&format!("/crate/{krate}/{version}/json.zst"))?)
 }
 
 /// standard method for crates.io index to get the folder for a crate,
@@ -52,7 +50,7 @@ async fn fetch_rustdoc_json(
     }
 
     fs::create_dir_all(&target_dir).await?;
-    let url = build_download_url(krate, &version)?;
+    let url = build_download_url(&config.docs_rs_server, krate, &version)?;
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 
