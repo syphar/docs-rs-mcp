@@ -121,7 +121,7 @@ mod tests {
         let cl = changelog(env.config(), "axum", &version, None)
             .await?
             .expect("changelog present");
-        assert_eq!(cl.source_file, "CHANGELOG.md");
+        assert!(cl.source_file.ends_with("/CHANGELOG.md"));
         assert!(!cl.content.is_empty());
         Ok(())
     }
