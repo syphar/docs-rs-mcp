@@ -49,9 +49,8 @@ async fn fetch_rustdoc_json(
 ) -> Result<Option<PathBuf>> {
     let version = version.to_string();
 
-    let target_dir = dir_for_crate(&config.cache_dir, krate);
+    let target_dir = dir_for_crate(&config.cache_dir, krate).join(&version);
     let target_path = target_dir
-        .join(&version)
         .join(target.unwrap_or("default_target"))
         .with_extension("json.zst");
 
