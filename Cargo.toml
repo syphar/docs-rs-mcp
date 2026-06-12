@@ -32,4 +32,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
 mockito = "1.7.2"
+pretty_assertions = "1.4.1"
 tempfile = "3.27.0"

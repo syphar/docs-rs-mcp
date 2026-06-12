@@ -70,15 +70,72 @@ pub(crate) fn search(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{docs_fixture, fixture, test_env};
+    use crate::test_utils::docs_fixture;
     use anyhow::Result;
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn test_list_modules() -> Result<()> {
-        let mut env = test_env().await?;
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let version = semver::Version::new(0, 8, 9);
-        let krate = docs_fixture("axum_0.8.9.json.zst").await?;
+        let results = search(&docs, None, Some(ItemKind::Module), None);
+
+        assert!(results.iter().all(|m| m.kind == ItemKind::Module));
+
+        assert_eq!(
+            results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
+            vec![
+                "axum",
+                "axum::body",
+                "axum::error_handling",
+                "axum::error_handling::future",
+                "axum::extract",
+                "axum::extract::connect_info",
+                "axum::extract::multipart",
+                "axum::extract::path",
+                "axum::extract::rejection",
+                "axum::extract::ws",
+                "axum::extract::ws::close_code",
+                "axum::extract::ws::rejection",
+                "axum::handler",
+                "axum::handler::future",
+                "axum::middleware",
+                "axum::middleware::future",
+                "axum::response",
+                "axum::response::sse",
+                "axum::routing",
+                "axum::routing::future",
+                "axum::routing::method_routing",
+                "axum::serve",
+                "axum::test_helpers",
+                "test_client",
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_modules_filtered() -> Result<()> {
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+
+        let results = search(&docs, Some("extract"), Some(ItemKind::Module), None);
+
+        assert!(results.iter().all(|m| m.kind == ItemKind::Module));
+
+        assert_eq!(
+            results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
+            vec![
+                "axum::extract",
+                "axum::extract::connect_info",
+                "axum::extract::multipart",
+                "axum::extract::path",
+                "axum::extract::rejection",
+                "axum::extract::ws",
+                "axum::extract::ws::close_code",
+                "axum::extract::ws::rejection",
+            ]
+        );
 
         Ok(())
     }
