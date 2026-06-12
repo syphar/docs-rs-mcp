@@ -88,7 +88,11 @@ there at path `P` are also reachable in the searched crate at `<prefix>::<P>`.
 Caveats:
   - Some paths surfaced here may go through private modules (importable name is the re-export, \
     not the canonical path).
-  - `#[doc(hidden)]` items may appear — not part of the stable API."
+  - `#[doc(hidden)]` items may appear — not part of the stable API.
+
+Follow-ups: for a struct/enum/trait result, call `list_methods` to see its methods or \
+`get_item` to read its signature, docs, and examples. For a module result, call `list_module` \
+to enumerate its children."
     )]
     async fn search_items(
         &self,
@@ -142,7 +146,13 @@ The result includes:
   - `\"full\"`: signature + raw `docs` + `examples` (Rust fenced code blocks extracted from \
     the doc string). Blocks tagged with non-Rust languages are skipped; rustdoc attributes \
     like `ignore`, `no_run`, `compile_fail`, `editionXXXX` are treated as Rust. Hidden \
-    doctest lines (starting with `#`) are kept verbatim — strip or substitute as needed."
+    doctest lines (starting with `#`) are kept verbatim — strip or substitute as needed.
+
+Follow-ups: when the item is a struct/enum/union, call `list_methods` on the same path to \
+see its methods. When it's a module, call `list_module` to enumerate its children. When it's \
+a trait, `list_methods` on a concrete type that implements it shows which methods are \
+inherited; `get_item` on the trait itself shows the trait's required/default methods inside \
+`inner`."
     )]
     async fn get_item(
         &self,
@@ -153,8 +163,13 @@ The result includes:
 
     #[tool(
         description = "\
-List inherent + trait-impl methods on a type. Walks every `impl` block in the crate whose \
-`for_` resolves to `type_path` and returns the function-shaped items inside.
+Answer questions like *\"what methods does X have?\"*, *\"list X's methods\"*, *\"show me the \
+API on X\"*. Returns every inherent method and every method from a trait impl on the type at \
+`type_path`. Use this whenever the user asks about the methods, operations, or behavior of a \
+specific struct/enum — it's faster and more focused than searching by name.
+
+Mechanism: walks every `impl` block in the crate whose `for_` resolves to `type_path` and \
+returns the function-shaped items inside.
 
 `type_path` is the fully-qualified path of the type, including the crate name (e.g. \
 `\"axum::routing::Router\"` or `\"axum::Router\"`); re-export paths are resolved to the \
@@ -191,7 +206,29 @@ impl ServerHandler for DocsServer {
         ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::from_build_env())
             .with_instructions(
-                "MCP server exposing Rust crate documentation from docs.rs rustdoc JSON."
+                "MCP server exposing Rust crate documentation from docs.rs rustdoc JSON.\n\
+                 \n\
+                 Typical flow:\n\
+                 1. `resolve_version(krate, req)` to turn a semver requirement (or `*`) \
+                    into a concrete version. All other tools take an exact version.\n\
+                 2. Discover paths with `search_items` (search by name/path/alias, \
+                    filtered by kind) or `list_module` (enumerate one module's children).\n\
+                 3. Drill in:\n   \
+                    - `get_item(path)` — full record for one item: signature, docs, \
+                      examples.\n   \
+                    - `list_methods(type_path)` — answers \"what methods does X have?\" \
+                      for a struct/enum/union/trait.\n   \
+                    - `list_module(path)` — recurse into a submodule.\n\
+                 \n\
+                 Match the tool to the question:\n   \
+                 - \"what methods does X have\" / \"how do I use X\" → `list_methods`.\n   \
+                 - \"what's in module X\" / \"what does X re-export\" → `list_module`.\n   \
+                 - \"find X\" / \"is there a Y in this crate\" → `search_items`.\n   \
+                 - \"show me X's signature/docs/examples\" → `get_item`.\n\
+                 \n\
+                 The `target` arg on the drill-in tools defaults to the host the server was \
+                 compiled for (usually the user's machine). Override when the user's \
+                 *project* targets something different (e.g. macOS dev → Linux deploy)."
                     .to_string(),
             )
     }
