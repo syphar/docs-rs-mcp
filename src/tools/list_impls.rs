@@ -31,6 +31,16 @@ struct ListImplsResult {
     impls: Vec<list_impls::Impl>,
 }
 
+#[tracing::instrument(
+    name = "tool.list_impls",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        type_path = %args.type_path,
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ListImplsArgs,

@@ -10,6 +10,11 @@ pub(crate) struct CrateMetadataArgs {
     pub(crate) version: Version,
 }
 
+#[tracing::instrument(
+    name = "tool.crate_metadata",
+    skip(context),
+    fields(krate = %args.krate, version = %args.version.as_ref()),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: CrateMetadataArgs,

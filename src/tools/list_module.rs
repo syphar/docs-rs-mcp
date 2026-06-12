@@ -40,6 +40,16 @@ struct ListModuleResult {
     unexpanded_external_globs: Vec<UnexpandedExternalGlob>,
 }
 
+#[tracing::instrument(
+    name = "tool.list_module",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        path = args.path.as_deref(),
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ListModuleArgs,

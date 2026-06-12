@@ -15,6 +15,15 @@ pub(crate) struct ChangelogArgs {
     pub(crate) section_version: Option<String>,
 }
 
+#[tracing::instrument(
+    name = "tool.changelog",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        section_version = args.section_version.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ChangelogArgs,

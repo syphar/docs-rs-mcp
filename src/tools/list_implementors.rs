@@ -32,6 +32,16 @@ struct ListImplementorsResult {
     implementors: Vec<list_implementors::Implementor>,
 }
 
+#[tracing::instrument(
+    name = "tool.list_implementors",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        trait_path = %args.trait_path,
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ListImplementorsArgs,

@@ -73,6 +73,18 @@ struct SearchItemsResult {
     unexpanded_external_globs: Vec<search_items::UnexpandedExternalGlob>,
 }
 
+#[tracing::instrument(
+    name = "tool.search_items",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        query = args.query.as_deref(),
+        kind = ?args.kind,
+        limit = args.limit,
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: SearchItemsArgs,

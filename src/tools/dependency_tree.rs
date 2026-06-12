@@ -16,6 +16,11 @@ struct DependencyTreeResult {
     dependencies: Vec<dependency_tree::Dependency>,
 }
 
+#[tracing::instrument(
+    name = "tool.dependency_tree",
+    skip(context),
+    fields(krate = %args.krate, version = %args.version.as_ref()),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: DependencyTreeArgs,

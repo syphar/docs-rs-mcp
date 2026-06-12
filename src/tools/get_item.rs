@@ -36,6 +36,17 @@ pub(crate) struct GetItemArgs {
     pub(crate) target: Option<String>,
 }
 
+#[tracing::instrument(
+    name = "tool.get_item",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        path = %args.path,
+        verbosity = ?args.verbosity,
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: GetItemArgs,

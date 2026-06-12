@@ -16,6 +16,11 @@ struct InspectFeatureFlagsResult {
     features: Vec<inspect_feature_flags::Feature>,
 }
 
+#[tracing::instrument(
+    name = "tool.inspect_feature_flags",
+    skip(context),
+    fields(krate = %args.krate, version = %args.version.as_ref()),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: InspectFeatureFlagsArgs,

@@ -15,6 +15,11 @@ pub(crate) struct ResolveVersionArgs {
     pub(crate) req: VersionReq,
 }
 
+#[tracing::instrument(
+    name = "tool.resolve_version",
+    skip(context),
+    fields(krate = %args.krate, req = %args.req.as_ref()),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ResolveVersionArgs,

@@ -31,6 +31,16 @@ struct ListMethodsResult {
     methods: Vec<list_methods::Method>,
 }
 
+#[tracing::instrument(
+    name = "tool.list_methods",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        type_path = %args.type_path,
+        target = args.target.as_deref(),
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: ListMethodsArgs,

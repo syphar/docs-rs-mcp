@@ -38,7 +38,26 @@ impl DocsServer {
     }
 
     #[tool(
-        description = "Resolve a crate version requirement against docs.rs. Returns the concrete version and if docs.rs has documentation for that release."
+        description = "\
+Answer questions like *\"what's the latest version of X?\"* / *\"latest 0.8.x of axum\"* / \
+*\"what 1.0-compatible version is out?\"* / *\"does docs.rs have version Y of X?\"* / \
+*\"is X published?\"*. Resolves a crate name + a semver requirement to a *concrete* published \
+version, and tells you whether docs.rs built documentation for it.
+
+ALWAYS call this first whenever the user gives anything other than a fully-specified \
+`MAJOR.MINOR.PATCH` (e.g. `\"1.2.3\"`) — every other tool in this server requires an exact \
+version string. In particular, `\"*\"`, `\"0.8\"`, `\"^1.0\"`, `\"~1.2\"`, `\">=1.0, <2\"` are \
+NOT valid `version` arguments anywhere else; pass them as `req` here first.
+
+The `req` argument is a Cargo-style semver requirement:
+  - `\"*\"` → latest published version overall.
+  - `\"=1.2.3\"` → exactly that version.
+  - `\"1.2\"` or `\"^1.2\"` → latest 1.x ≥ 1.2 (caret semantics).
+  - `\"~1.2.3\"` → latest 1.2.x.
+  - `\">=1.0, <2\"` → latest version in that range.
+
+Result is `{ version, doc_status }`. `doc_status = true` means docs.rs has built rustdoc JSON for \
+that release — required for `search_items`, `list_module`, `get_item`, etc."
     )]
     async fn resolve_version(
         &self,
@@ -272,7 +291,12 @@ documentation URL, MSRV (`rust-version`), edition, authors, keywords, categories
 `[package]` section from the crate's `Cargo.toml` on crates.io.
 
 Use this when the user asks *\"what is this crate?\"* / *\"who maintains it?\"* / *\"what's \
-the MSRV?\"* / *\"what license?\"*.")]
+the MSRV?\"* / *\"what license?\"*.
+
+NOT for *\"what version is X?\"* / *\"latest X\"* / *\"X 0.8\"* — this tool needs a fully-\
+specified exact version (e.g. `\"1.2.3\"`) and won't accept `\"*\"`, `\"0.8\"`, `\"^1.0\"`, \
+or any range. Call `resolve_version` first to turn any non-exact requirement into a \
+concrete version, then pass that here.")]
     async fn crate_metadata(
         &self,
         Parameters(args): Parameters<CrateMetadataArgs>,
@@ -353,6 +377,12 @@ impl ServerHandler for DocsServer {
                     - `list_module(path)` — recurse into a submodule.\n\
                  \n\
                  Match the tool to the question:\n   \
+                 - any version question or non-exact version (\"latest of X\", \"X 0.8\", \
+                 \"X ^1.0\", \"does X 1.2 exist\", \"is docs.rs ready\") → `resolve_version` \
+                 (pass the requirement as `req`; use `req=\"*\"` for latest). \
+                 NEVER pass anything other than a fully-specified `MAJOR.MINOR.PATCH` as \
+                 `version` to any other tool — `\"*\"`, `\"0.8\"`, `\"^1.0\"`, `\"~1.2\"`, \
+                 ranges, etc. are invalid; resolve them through `resolve_version` first.\n   \
                  - \"what methods does X have\" / \"how do I use X\" → `list_methods`.\n   \
                  - \"which traits does X implement\" / \"is X Send/Sync/...\" → `list_impls`.\n   \
                  - \"what implements this trait\" / \"which types are X\" → `list_implementors`.\n   \

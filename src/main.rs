@@ -5,7 +5,7 @@ use crate::{
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use std::path::{Path, PathBuf};
-use tracing::{error, info, level_filters::LevelFilter};
+use tracing::{Instrument as _, error, info, info_span, level_filters::LevelFilter};
 use tracing_appender::{non_blocking::WorkerGuard, rolling};
 use tracing_subscriber::{
     EnvFilter, Layer,
@@ -38,6 +38,7 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
     let pid = std::process::id();
     let file_appender = rolling::Builder::new()
         .rotation(rolling::Rotation::DAILY)
+        .latest_symlink(format!("{APP_NAME}.log"))
         .filename_prefix(format!("{APP_NAME}.{pid}"))
         .filename_suffix("log")
         .max_log_files(10)
@@ -128,8 +129,11 @@ async fn main() -> Result<()> {
 
     let context = Context::new(config);
 
+    let span = info_span!("instance", pid = std::process::id());
+
     let service = DocsServer::new(context)
         .serve(stdio())
+        .instrument(span)
         .await
         .inspect_err(|e| {
             error!(?e, "serving error");

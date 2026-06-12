@@ -20,6 +20,15 @@ struct FindExamplesResult {
     examples: Vec<find_examples::Example>,
 }
 
+#[tracing::instrument(
+    name = "tool.find_examples",
+    skip(context),
+    fields(
+        krate = %args.krate,
+        version = %args.version.as_ref(),
+        include_content = args.include_content,
+    ),
+)]
 pub(crate) async fn handle(
     context: &Context,
     args: FindExamplesArgs,
