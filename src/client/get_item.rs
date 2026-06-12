@@ -57,7 +57,7 @@ pub(crate) struct ItemRecord {
 /// rustdoc JSON).
 pub(crate) fn get_item(
     docs: &rustdoc_types::Crate,
-    path: &[String],
+    path: &[&str],
     verbosity: Verbosity,
 ) -> Option<ItemRecord> {
     let (id, item) = resolve_item(docs, path)?;
@@ -93,7 +93,7 @@ pub(crate) fn get_item(
 
 pub(crate) fn resolve_item<'a>(
     docs: &'a rustdoc_types::Crate,
-    path: &[String],
+    path: &[&str],
 ) -> Option<(Id, &'a rustdoc_types::Item)> {
     // Fast path: direct canonical lookup.
     if let Some(id) = docs
@@ -110,7 +110,7 @@ pub(crate) fn resolve_item<'a>(
 
 fn walk_from_root<'a>(
     docs: &'a rustdoc_types::Crate,
-    path: &[String],
+    path: &[&str],
 ) -> Option<(Id, &'a rustdoc_types::Item)> {
     // Strip the leading crate-name segment if present.
     let crate_name = docs
@@ -118,7 +118,7 @@ fn walk_from_root<'a>(
         .get(&docs.root)
         .and_then(|s| s.path.first())
         .map(String::as_str);
-    let segments: &[String] = if path.first().map(String::as_str) == crate_name {
+    let segments: &[&str] = if path.first() == crate_name.as_ref() {
         &path[1..]
     } else {
         path
@@ -136,7 +136,7 @@ fn walk_from_root<'a>(
                 ItemEnum::Use(u) => Some(u.name.as_str()),
                 _ => child.name.as_deref(),
             };
-            if name == Some(segment.as_str()) {
+            if name == Some(segment) {
                 next = chase_use_chain(docs, *child_id);
                 break;
             }
@@ -223,7 +223,7 @@ mod tests {
     async fn test_canonical_path() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let path = ["axum", "routing", "Router"].map(String::from);
+        let path = ["axum", "routing", "Router"];
         let item = get_item(&docs, &path, Verbosity::Signature).expect("Router exists");
         assert_eq!(item.kind, ItemKind::Struct);
         assert_eq!(item.path, "axum::routing::Router");
@@ -237,7 +237,7 @@ mod tests {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
         // `axum::Router` is a re-export; canonical is `axum::routing::Router`.
-        let path = ["axum", "Router"].map(String::from);
+        let path = ["axum", "Router"];
         let item = get_item(&docs, &path, Verbosity::Signature).expect("Router via re-export");
         assert_eq!(item.kind, ItemKind::Struct);
         assert_eq!(item.path, "axum::routing::Router");
@@ -250,7 +250,7 @@ mod tests {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
         // Multipart's docs contain a Rust example block.
-        let path = ["axum", "extract", "multipart", "Multipart"].map(String::from);
+        let path = ["axum", "extract", "multipart", "Multipart"];
         let item = get_item(&docs, &path, Verbosity::Full).expect("Multipart exists");
         assert!(item.docs.is_some(), "full verbosity includes docs");
         assert_eq!(
@@ -267,7 +267,7 @@ mod tests {
     async fn test_unknown_path_returns_none() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let path = ["axum", "no_such_thing"].map(String::from);
+        let path = ["axum", "no_such_thing"];
         assert!(get_item(&docs, &path, Verbosity::Signature).is_none());
 
         Ok(())

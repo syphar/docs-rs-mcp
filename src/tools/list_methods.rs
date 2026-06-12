@@ -43,7 +43,7 @@ pub(crate) async fn handle(
             McpError::resource_not_found("crate or version not found on docs.rs", None)
         })?;
 
-    let path: Vec<String> = args.type_path.split("::").map(str::to_string).collect();
+    let path: Vec<&str> = args.type_path.split("::").collect();
 
     let methods = list_methods::list_methods(&docs, &path)
         .ok_or_else(|| McpError::resource_not_found("type not found at the given path", None))?;

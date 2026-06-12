@@ -29,10 +29,7 @@ pub(crate) struct Method {
 ///   - Default trait methods that the impl doesn't override aren't repeated
 ///     here; call `get_item` on the trait to see them.
 ///   - Only function-shaped items are returned (no associated consts/types).
-pub(crate) fn list_methods(
-    docs: &rustdoc_types::Crate,
-    type_path: &[String],
-) -> Option<Vec<Method>> {
+pub(crate) fn list_methods(docs: &rustdoc_types::Crate, type_path: &[&str]) -> Option<Vec<Method>> {
     let (type_id, _) = resolve_item(docs, type_path)?;
 
     let mut methods: Vec<Method> = Vec::new();
@@ -99,7 +96,7 @@ mod tests {
     async fn test_list_router_methods() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let path = ["axum", "routing", "Router"].map(String::from);
+        let path = ["axum", "routing", "Router"];
         let methods = list_methods(&docs, &path).expect("Router exists");
 
         // Methods we'd expect any axum 0.x Router to have.
@@ -123,10 +120,8 @@ mod tests {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
         // axum::Router is a re-export; should resolve and find the same methods.
-        let canon = list_methods(&docs, &["axum", "routing", "Router"].map(String::from))
-            .expect("canonical");
-        let rexp =
-            list_methods(&docs, &["axum", "Router"].map(String::from)).expect("re-export");
+        let canon = list_methods(&docs, &["axum", "routing", "Router"]).expect("canonical");
+        let rexp = list_methods(&docs, &["axum", "Router"]).expect("re-export");
         assert_eq!(canon.len(), rexp.len());
 
         Ok(())
@@ -135,7 +130,7 @@ mod tests {
     #[tokio::test]
     async fn test_unknown_type_returns_none() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
-        let path = ["axum", "no_such_type"].map(String::from);
+        let path = ["axum", "no_such_type"];
         assert!(list_methods(&docs, &path).is_none());
         Ok(())
     }

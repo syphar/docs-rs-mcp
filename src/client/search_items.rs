@@ -1,7 +1,10 @@
 use crate::types::rustdoc_types::ItemKind;
 use rustdoc_types::{Id, ItemEnum};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    iter,
+};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Match {
@@ -94,12 +97,16 @@ pub(crate) fn search(
     matches
 }
 
-fn matches_query(query: Option<&str>, name: &str, path: &str, aliases: &[String]) -> bool {
+fn matches_query<I, S>(query: Option<&str>, name: &str, path: &str, aliases: I) -> bool
+where
+    S: AsRef<str>,
+    I: IntoIterator<Item = S>,
+{
     let Some(q) = query else { return true };
     let mut haystack = format!("{name} {path}");
     for a in aliases {
         haystack.push(' ');
-        haystack.push_str(a);
+        haystack.push_str(a.as_ref());
     }
     haystack.to_lowercase().contains(q)
 }
@@ -331,7 +338,7 @@ fn emit_external_reexport(
     let path = join_path(prefix, name);
     // Aliases aren't available for cross-crate items — we only have the path
     // summary, not the full Item with its attrs.
-    if !matches_query(query, name, &path, &[]) {
+    if !matches_query(query, name, &path, iter::empty::<String>()) {
         return;
     }
 

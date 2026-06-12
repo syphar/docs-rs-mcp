@@ -19,10 +19,7 @@ pub(crate) struct Impl {
 /// when no type resolves at the path, or when the resolved item is not a
 /// struct/enum/union/primitive (those are the only kinds rustdoc records
 /// impls for directly).
-pub(crate) fn list_impls(
-    docs: &rustdoc_types::Crate,
-    type_path: &[String],
-) -> Option<Vec<Impl>> {
+pub(crate) fn list_impls(docs: &rustdoc_types::Crate, type_path: &[&str]) -> Option<Vec<Impl>> {
     let (_id, item) = resolve_item(docs, type_path)?;
     let impl_ids = type_impls(item)?;
 
@@ -70,7 +67,7 @@ mod tests {
     async fn test_router_impls() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let path = ["axum", "routing", "Router"].map(String::from);
+        let path = ["axum", "routing", "Router"];
         let impls = list_impls(&docs, &path).expect("Router exists");
 
         let trait_names: Vec<&str> = impls.iter().map(|i| i.trait_path.as_str()).collect();
@@ -92,10 +89,8 @@ mod tests {
     async fn test_reexport_path_resolves() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let canon = list_impls(&docs, &["axum", "routing", "Router"].map(String::from))
-            .expect("canonical");
-        let rexp =
-            list_impls(&docs, &["axum", "Router"].map(String::from)).expect("re-export");
+        let canon = list_impls(&docs, &["axum", "routing", "Router"]).expect("canonical");
+        let rexp = list_impls(&docs, &["axum", "Router"]).expect("re-export");
         assert_eq!(canon.len(), rexp.len());
 
         Ok(())
@@ -104,7 +99,7 @@ mod tests {
     #[tokio::test]
     async fn test_unknown_type_returns_none() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
-        let path = ["axum", "no_such_type"].map(String::from);
+        let path = ["axum", "no_such_type"];
         assert!(list_impls(&docs, &path).is_none());
         Ok(())
     }

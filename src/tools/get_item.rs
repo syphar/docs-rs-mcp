@@ -48,7 +48,7 @@ pub(crate) async fn handle(
             McpError::resource_not_found("crate or version not found on docs.rs", None)
         })?;
 
-    let path: Vec<String> = args.path.split("::").map(str::to_string).collect();
+    let path: Vec<&str> = args.path.split("::").collect();
 
     let record = get_item::get_item(&docs, &path, args.verbosity)
         .ok_or_else(|| McpError::resource_not_found("item not found at the given path", None))?;

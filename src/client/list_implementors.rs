@@ -29,7 +29,7 @@ pub(crate) struct Implementor {
 ///     `None`; check `for_type` for the structured form.
 pub(crate) fn list_implementors(
     docs: &rustdoc_types::Crate,
-    trait_path: &[String],
+    trait_path: &[&str],
 ) -> Option<Vec<Implementor>> {
     let (_id, item) = resolve_item(docs, trait_path)?;
     let ItemEnum::Trait(t) = &item.inner else {
@@ -69,7 +69,7 @@ mod tests {
     async fn test_handler_implementors() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let path = ["axum", "handler", "Handler"].map(String::from);
+        let path = ["axum", "handler", "Handler"];
         let implementors = list_implementors(&docs, &path).expect("Handler trait exists");
 
         // axum's Handler has impls (e.g. for F: FnOnce). Don't pin exact names —
@@ -86,7 +86,7 @@ mod tests {
     async fn test_non_trait_returns_none() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
         // Router is a struct, not a trait.
-        let path = ["axum", "routing", "Router"].map(String::from);
+        let path = ["axum", "routing", "Router"];
         assert!(list_implementors(&docs, &path).is_none());
         Ok(())
     }
@@ -94,7 +94,7 @@ mod tests {
     #[tokio::test]
     async fn test_unknown_trait_returns_none() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
-        let path = ["axum", "no_such_trait"].map(String::from);
+        let path = ["axum", "no_such_trait"];
         assert!(list_implementors(&docs, &path).is_none());
         Ok(())
     }

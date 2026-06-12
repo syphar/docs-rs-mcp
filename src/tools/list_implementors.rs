@@ -44,7 +44,7 @@ pub(crate) async fn handle(
             McpError::resource_not_found("crate or version not found on docs.rs", None)
         })?;
 
-    let path: Vec<String> = args.trait_path.split("::").map(str::to_string).collect();
+    let path: Vec<_> = args.trait_path.split("::").collect();
 
     let implementors = list_implementors::list_implementors(&docs, &path)
         .ok_or_else(|| McpError::resource_not_found("no trait found at the given path", None))?;
