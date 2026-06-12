@@ -94,3 +94,40 @@ pub(crate) async fn handle(
             .map_err(|err| McpError::internal_error(err.to_string(), None))?,
     ))
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::{
+//         client::docs::build_download_url,
+//         test_utils::{fixture, test_env},
+//     };
+//     use anyhow::Result;
+
+//     #[tokio::test]
+//     async fn test_list_modules() -> Result<()> {
+//         let mut env = test_env().await?;
+
+//         let version = semver::Version::new(0, 8, 9);
+//         let fixure_path = fixture("axum_0.8.9.json.zst")?;
+
+//         let _mock = env
+//             .server
+//             .mock(
+//                 "GET",
+//                 build_download_url("axum", &version.to_string()).as_str(),
+//             )
+//             .with_status(200)
+//             .with_body_from_file(&fixure_path)
+//             .create();
+
+//         let docs = get_docs(env.config(), "axum", &version).await?;
+//         assert_eq!(docs.crate_version, Some(version.to_string()));
+
+//         let root = &docs.paths[&docs.root];
+//         assert_eq!(root.path, vec!["axum"]);
+//         assert_eq!(root.kind, rustdoc_types::ItemKind::Module);
+
+//         Ok(())
+//     }
+// }

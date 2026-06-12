@@ -15,7 +15,7 @@ use tokio::{
 use tokio_util::io::StreamReader;
 use tracing::debug;
 
-fn build_download_url(krate: &str, version: &str) -> String {
+pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
     format!("/crate/{krate}/{version}/json.zst")
 }
 
