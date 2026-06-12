@@ -12,11 +12,11 @@ pub(crate) struct Match {
 
 pub(crate) fn search(
     docs: &rustdoc_types::Crate,
-    query: &str,
+    query: Option<&str>,
     kind_filter: Option<ItemKind>,
     limit: Option<usize>,
 ) -> Vec<Match> {
-    let query = query.to_lowercase();
+    let query = query.map(|q| q.to_lowercase());
 
     let mut matches = docs
         .index
@@ -35,12 +35,21 @@ pub(crate) fn search(
             let name = item.name.clone().unwrap_or_default();
             let haystack = format!("{name} {path}").to_lowercase();
 
-            haystack.contains(&query).then_some(Match {
-                id: item.id,
-                name,
-                path,
-                kind,
-            })
+            if let Some(query) = &query {
+                haystack.contains(query).then_some(Match {
+                    id: item.id,
+                    name,
+                    path,
+                    kind,
+                })
+            } else {
+                Some(Match {
+                    id: item.id,
+                    name,
+                    path,
+                    kind,
+                })
+            }
         })
         .collect::<Vec<_>>();
 
@@ -56,4 +65,21 @@ pub(crate) fn search(
     }
 
     matches
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{docs_fixture, fixture, test_env};
+    use anyhow::Result;
+
+    #[tokio::test]
+    async fn test_list_modules() -> Result<()> {
+        let mut env = test_env().await?;
+
+        let version = semver::Version::new(0, 8, 9);
+        let krate = docs_fixture("axum_0.8.9.json.zst").await?;
+
+        Ok(())
+    }
 }
