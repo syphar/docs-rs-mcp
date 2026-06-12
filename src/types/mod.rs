@@ -1,1 +1,1 @@
-pub(crate) mod semver_types;
+pub(crate) mod semver;
