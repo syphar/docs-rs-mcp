@@ -1,5 +1,8 @@
 use crate::{
-    client::docs::{SearchItemMatch, get_docs, search_items},
+    client::{
+        docs::get_docs,
+        search_items::{SearchItemMatch, search_items},
+    },
     config::Config,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
