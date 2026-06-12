@@ -1,6 +1,10 @@
-use crate::{client::docs::get_docs, config::Config, types::semver::Version};
+use crate::{
+    client::docs::get_docs,
+    config::Config,
+    types::{rustdoc_types::ItemKind, semver::Version},
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
-use rustdoc_types::{Id, ItemKind};
+use rustdoc_types::Id;
 use serde::Serialize;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -18,7 +22,7 @@ pub(crate) struct SearchItemsArgs {
     pub(crate) query: String,
     /// Optional item kind filter, e.g. "struct", "enum", "trait", "function", "module".
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) kind: Option<SearchItemKind>,
+    pub(crate) kind: Option<ItemKind>,
     /// Maximum number of matches to return. Defaults to 20.
     #[serde(default = "default_limit")]
     pub(crate) limit: usize,
@@ -26,109 +30,6 @@ pub(crate) struct SearchItemsArgs {
 
 fn default_limit() -> usize {
     20
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-#[schemars(rename_all = "snake_case")]
-pub(crate) enum SearchItemKind {
-    Module,
-    ExternCrate,
-    Use,
-    Struct,
-    StructField,
-    Union,
-    Enum,
-    Variant,
-    Function,
-    TypeAlias,
-    Constant,
-    Trait,
-    TraitAlias,
-    Impl,
-    Static,
-    ExternType,
-    Macro,
-    ProcAttribute,
-    ProcDerive,
-    AssocConst,
-    AssocType,
-    Primitive,
-    Keyword,
-    Attribute,
-}
-
-impl From<SearchItemKind> for ItemKind {
-    fn from(kind: SearchItemKind) -> Self {
-        match kind {
-            SearchItemKind::Module => ItemKind::Module,
-            SearchItemKind::ExternCrate => ItemKind::ExternCrate,
-            SearchItemKind::Use => ItemKind::Use,
-            SearchItemKind::Struct => ItemKind::Struct,
-            SearchItemKind::StructField => ItemKind::StructField,
-            SearchItemKind::Union => ItemKind::Union,
-            SearchItemKind::Enum => ItemKind::Enum,
-            SearchItemKind::Variant => ItemKind::Variant,
-            SearchItemKind::Function => ItemKind::Function,
-            SearchItemKind::TypeAlias => ItemKind::TypeAlias,
-            SearchItemKind::Constant => ItemKind::Constant,
-            SearchItemKind::Trait => ItemKind::Trait,
-            SearchItemKind::TraitAlias => ItemKind::TraitAlias,
-            SearchItemKind::Impl => ItemKind::Impl,
-            SearchItemKind::Static => ItemKind::Static,
-            SearchItemKind::ExternType => ItemKind::ExternType,
-            SearchItemKind::Macro => ItemKind::Macro,
-            SearchItemKind::ProcAttribute => ItemKind::ProcAttribute,
-            SearchItemKind::ProcDerive => ItemKind::ProcDerive,
-            SearchItemKind::AssocConst => ItemKind::AssocConst,
-            SearchItemKind::AssocType => ItemKind::AssocType,
-            SearchItemKind::Primitive => ItemKind::Primitive,
-            SearchItemKind::Keyword => ItemKind::Keyword,
-            SearchItemKind::Attribute => ItemKind::Attribute,
-        }
-    }
-}
-
-impl From<ItemKind> for SearchItemKind {
-    fn from(kind: ItemKind) -> Self {
-        match kind {
-            ItemKind::Module => SearchItemKind::Module,
-            ItemKind::ExternCrate => SearchItemKind::ExternCrate,
-            ItemKind::Use => SearchItemKind::Use,
-            ItemKind::Struct => SearchItemKind::Struct,
-            ItemKind::StructField => SearchItemKind::StructField,
-            ItemKind::Union => SearchItemKind::Union,
-            ItemKind::Enum => SearchItemKind::Enum,
-            ItemKind::Variant => SearchItemKind::Variant,
-            ItemKind::Function => SearchItemKind::Function,
-            ItemKind::TypeAlias => SearchItemKind::TypeAlias,
-            ItemKind::Constant => SearchItemKind::Constant,
-            ItemKind::Trait => SearchItemKind::Trait,
-            ItemKind::TraitAlias => SearchItemKind::TraitAlias,
-            ItemKind::Impl => SearchItemKind::Impl,
-            ItemKind::Static => SearchItemKind::Static,
-            ItemKind::ExternType => SearchItemKind::ExternType,
-            ItemKind::Macro => SearchItemKind::Macro,
-            ItemKind::ProcAttribute => SearchItemKind::ProcAttribute,
-            ItemKind::ProcDerive => SearchItemKind::ProcDerive,
-            ItemKind::AssocConst => SearchItemKind::AssocConst,
-            ItemKind::AssocType => SearchItemKind::AssocType,
-            ItemKind::Primitive => SearchItemKind::Primitive,
-            ItemKind::Keyword => SearchItemKind::Keyword,
-            ItemKind::Attribute => SearchItemKind::Attribute,
-        }
-    }
 }
 
 #[derive(Debug, Serialize)]
@@ -141,7 +42,7 @@ struct SearchItemMatch {
     id: Id,
     name: String,
     path: String,
-    kind: SearchItemKind,
+    kind: ItemKind,
 }
 
 pub(crate) async fn handle(
@@ -158,7 +59,7 @@ pub(crate) async fn handle(
         .index
         .values()
         .filter_map(|item| {
-            let kind: SearchItemKind = item.inner.item_kind().into();
+            let kind: ItemKind = item.inner.item_kind().into();
             if kind_filter.is_some_and(|filter| filter != kind) {
                 return None;
             }
