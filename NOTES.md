@@ -1,5 +1,8 @@
 # notes
 
+## TODO:
+- support multiple format versions? use multiple rustdoc-types crate versoins?
+
 ## mcp libs
 * https://crates.io/crates/rust-mcp-sdk
 * https://crates.io/crates/rmcp ( just protocol?)
