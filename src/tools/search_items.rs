@@ -43,9 +43,17 @@ pub(crate) struct SearchItemsArgs {
     /// their host (look at `Cargo.toml [build] target`, `.cargo/config.toml`,
     /// or whatever they've said about deployment). Common case: macOS dev
     /// deploying to Linux — pass `"x86_64-unknown-linux-gnu"`.
-    /// Target matters because `#[cfg(target_os = ...)]` items differ —
-    /// `std::os::unix::*` only appears on Unix targets, `std::os::windows::*`
-    /// only on Windows, etc.
+    ///
+    /// If docs.rs has no build for the requested target, the server
+    /// transparently falls back to the *crate's* default target — whichever
+    /// target the crate author marked as the default in their docs.rs
+    /// metadata, served at `/crate/<krate>/<version>/json.zst` without a
+    /// platform segment. For most crates that's `x86_64-unknown-linux-gnu`,
+    /// but a Windows-centric crate (e.g. `windows-sys`) might default to a
+    /// Windows triple. The fallback assumes the crate's public API is the
+    /// same across targets — usually true, but `#[cfg(target_os = ...)]`
+    /// items will diverge: `std::os::unix::*` only appears on Unix targets,
+    /// `std::os::windows::*` only on Windows, etc.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) target: Option<String>,
 }

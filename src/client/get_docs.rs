@@ -76,11 +76,13 @@ async fn fetch_rustdoc_json(
 }
 
 /// Fetch rustdoc JSON for `(krate, version, target)`. On a 404 for the
-/// requested `target`, transparently retries with [`FALLBACK_TARGET`] —
-/// assumes the crate's API is the same across targets, which is true for
-/// most crates that don't gate items on `#[cfg(target_os = ...)]`.
+/// requested `target`, transparently retries with `target = None`, which
+/// resolves to whichever target the crate author marked as default in their
+/// docs.rs metadata (served by docs.rs at `/crate/<k>/<v>/json.zst` without
+/// a platform segment). Assumes the crate's API is the same across targets,
+/// which holds for crates that don't gate items on `#[cfg(target_os = ...)]`.
 ///
-/// Returns `Ok(None)` only when even the fallback build doesn't exist
+/// Returns `Ok(None)` only when even the crate's default build doesn't exist
 /// (typically: unknown crate or version).
 pub(crate) async fn get_docs(
     config: &Config,

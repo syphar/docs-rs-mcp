@@ -52,10 +52,13 @@ deployment). The common case is macOS/Windows dev → Linux server deploy: pass 
 `target: \"x86_64-unknown-linux-gnu\"` then. Using the wrong target hides items gated on \
 `#[cfg(target_os = ...)]` and can surface items that won't compile on the real target.
 
-If docs.rs has no build for the requested `target` (most crates only opt into the default \
-build), the server falls back to `x86_64-unknown-linux-gnu` silently and returns those \
-results, assuming the crate's API is the same across targets. Cfg-gated items may then be \
-missing or extra — verify against the user's actual target if precision matters.
+If docs.rs has no build for the requested `target` (most crates only opt into one target), \
+the server falls back to the *crate's* default target — whichever target the crate author \
+marked as default in their docs.rs metadata. For most crates that's \
+`x86_64-unknown-linux-gnu`, but a Windows-centric crate like `windows-sys` might default to \
+a Windows triple. The fallback is silent and assumes the crate's API is the same across \
+targets; cfg-gated items may then be missing or extra — verify against the user's actual \
+target if precision matters.
 
 Each result has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), \
 `kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via \
