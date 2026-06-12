@@ -1,4 +1,4 @@
-use crate::{client::get_docs::parse_rustdoc_json, config::Config};
+use crate::{client::get_docs::parse_rustdoc_json, context::Config};
 use anyhow::{Result, bail};
 use reqwest::Url;
 use std::path::{Path, PathBuf};

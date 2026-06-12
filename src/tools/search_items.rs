@@ -1,6 +1,6 @@
 use crate::{
     client::{get_docs::get_docs, search_items},
-    config::Config,
+    context::Config,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};

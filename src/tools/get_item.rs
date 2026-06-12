@@ -3,7 +3,7 @@ use crate::{
         get_docs::get_docs,
         get_item::{self, Verbosity},
     },
-    config::Config,
+    context::Config,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -36,10 +36,7 @@ pub(crate) struct GetItemArgs {
     pub(crate) target: Option<String>,
 }
 
-pub(crate) async fn handle(
-    config: &Config,
-    args: GetItemArgs,
-) -> Result<CallToolResult, McpError> {
+pub(crate) async fn handle(config: &Config, args: GetItemArgs) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
     let docs = get_docs(config, &args.krate, args.version.as_ref(), Some(target))
         .await

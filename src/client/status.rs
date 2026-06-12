@@ -1,4 +1,4 @@
-use crate::{client::CLIENT, config::Config};
+use crate::{client::CLIENT, context::Config};
 use anyhow::Result;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};

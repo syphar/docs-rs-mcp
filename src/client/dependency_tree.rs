@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, config::Config};
+use crate::{client::get_source::fetch_cargo_manifest, context::Config};
 use anyhow::Result;
 use cargo_manifest::{Dependency as ManifestDep, DepsSet};
 use serde::Serialize;
@@ -49,8 +49,18 @@ pub(crate) async fn dependency_tree(
     };
 
     let mut out = Vec::new();
-    collect_section(manifest.dependencies.as_ref(), DependencyKind::Normal, None, &mut out);
-    collect_section(manifest.dev_dependencies.as_ref(), DependencyKind::Dev, None, &mut out);
+    collect_section(
+        manifest.dependencies.as_ref(),
+        DependencyKind::Normal,
+        None,
+        &mut out,
+    );
+    collect_section(
+        manifest.dev_dependencies.as_ref(),
+        DependencyKind::Dev,
+        None,
+        &mut out,
+    );
     collect_section(
         manifest.build_dependencies.as_ref(),
         DependencyKind::Build,

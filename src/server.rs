@@ -1,5 +1,5 @@
 use crate::{
-    config::Config,
+    context::Config,
     tools::{
         changelog::{self, ChangelogArgs},
         crate_metadata::{self, CrateMetadataArgs},
@@ -47,8 +47,7 @@ impl DocsServer {
         resolve_version::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Search rustdoc items for a crate version by name or path, optionally filtering by item kind.
 Requires an exact version — call `resolve_version` first if you only have a semver requirement.
 
@@ -99,8 +98,7 @@ Caveats:
 
 Follow-ups: for a struct/enum/trait result, call `list_methods` to see its methods or \
 `get_item` to read its signature, docs, and examples. For a module result, call `list_module` \
-to enumerate its children."
-    )]
+to enumerate its children.")]
     async fn search_items(
         &self,
         Parameters(args): Parameters<SearchItemsArgs>,
@@ -108,8 +106,7 @@ to enumerate its children."
         search_items::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 List the direct children of a module in a crate. Returns one row per child with `name`, \
 `kind`, `summary` (first paragraph of the doc comment, if any), `deprecated`, and optionally \
 `reexport` (when the child is a `pub use` of something else).
@@ -123,8 +120,7 @@ module path including the crate name (e.g. `\"axum::extract\"`); omit it to list
 root. Non-glob `pub use` re-exports appear as their own row, with `reexport.source_crate` \
 identifying where the underlying item lives. Glob re-exports (`pub use foo::*`) of *external* \
 crates are reported separately via `unexpanded_external_globs` — follow up by calling \
-`list_module` (or `search_items`) on the source crate."
-    )]
+`list_module` (or `search_items`) on the source crate.")]
     async fn list_module(
         &self,
         Parameters(args): Parameters<ListModuleArgs>,
@@ -132,8 +128,7 @@ crates are reported separately via `unexpanded_external_globs` — follow up by 
         list_module::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Return the full record for a single item by its fully-qualified path. Requires an exact \
 version — call `resolve_version` first if you only have a semver requirement.
 
@@ -159,8 +154,7 @@ Follow-ups: when the item is a struct/enum/union, call `list_methods` on the sam
 see its methods. When it's a module, call `list_module` to enumerate its children. When it's \
 a trait, `list_methods` on a concrete type that implements it shows which methods are \
 inherited; `get_item` on the trait itself shows the trait's required/default methods inside \
-`inner`."
-    )]
+`inner`.")]
     async fn get_item(
         &self,
         Parameters(args): Parameters<GetItemArgs>,
@@ -168,8 +162,7 @@ inherited; `get_item` on the trait itself shows the trait's required/default met
         get_item::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Answer questions like *\"what methods does X have?\"*, *\"list X's methods\"*, *\"show me the \
 API on X\"*. Returns every inherent method and every method from a trait impl on the type at \
 `type_path`. Use this whenever the user asks about the methods, operations, or behavior of a \
@@ -200,8 +193,7 @@ Limitations:
 Related: `list_impls` returns the traits a type implements (no method bodies). \
 `list_implementors` is the inverse — types that implement a given trait.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
-    )]
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.")]
     async fn list_methods(
         &self,
         Parameters(args): Parameters<ListMethodsArgs>,
@@ -209,8 +201,7 @@ Requires an exact `version` and uses the same `target` defaulting/fallback as ot
         list_methods::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Answer *\"which traits does X implement?\"* / *\"what traits is X?\"*. Returns every trait \
 impl on the type at `type_path`, including auto-derived ones (`Send`/`Sync`/`Unpin`) and \
 blanket impls applied to it.
@@ -225,8 +216,7 @@ Each row has:
 struct/enum/union/primitive (those are the kinds rustdoc records direct impls on). Use \
 `list_methods` if you want the method list instead of the trait list.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
-    )]
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.")]
     async fn list_impls(
         &self,
         Parameters(args): Parameters<ListImplsArgs>,
@@ -234,8 +224,7 @@ Requires an exact `version` and uses the same `target` defaulting/fallback as ot
         list_impls::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Answer *\"what implements this trait?\"* / *\"which types are X?\"*. The inverse of \
 `list_impls`. Returns every type that implements the trait at `trait_path` *within this \
 crate's rustdoc JSON*.
@@ -251,8 +240,7 @@ Limitation: rustdoc JSON is single-crate. Implementations in *other* crates (e.g
 downstream crate implementing this trait on its own type) are not visible here. To find \
 those you'd have to search those crates explicitly.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
-    )]
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.")]
     async fn list_implementors(
         &self,
         Parameters(args): Parameters<ListImplementorsArgs>,
@@ -260,8 +248,7 @@ Requires an exact `version` and uses the same `target` defaulting/fallback as ot
         list_implementors::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Answer *\"how do I enable feature X?\"*, *\"what features does this crate have?\"*, *\"does \
 this crate need `tokio/macros`?\"*. Reads the `[features]` section from the crate's \
 `Cargo.toml`.
@@ -271,8 +258,7 @@ Each row is `{name, enables, default}`:
     optional deps, `foo/bar` for transitive feature activation).
   - `default`: true when this feature is in the crate's `default` feature set.
 
-Requires an exact `version` (the published Cargo.toml on crates.io for that release)."
-    )]
+Requires an exact `version` (the published Cargo.toml on crates.io for that release).")]
     async fn inspect_feature_flags(
         &self,
         Parameters(args): Parameters<InspectFeatureFlagsArgs>,
@@ -280,15 +266,13 @@ Requires an exact `version` (the published Cargo.toml on crates.io for that rele
         inspect_feature_flags::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Quick orientation for a crate: name, version, description, repository, homepage, license, \
 documentation URL, MSRV (`rust-version`), edition, authors, keywords, categories. Reads the \
 `[package]` section from the crate's `Cargo.toml` on crates.io.
 
 Use this when the user asks *\"what is this crate?\"* / *\"who maintains it?\"* / *\"what's \
-the MSRV?\"* / *\"what license?\"*."
-    )]
+the MSRV?\"* / *\"what license?\"*.")]
     async fn crate_metadata(
         &self,
         Parameters(args): Parameters<CrateMetadataArgs>,
@@ -296,8 +280,7 @@ the MSRV?\"* / *\"what license?\"*."
         crate_metadata::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Direct dependencies of a crate (one level, not transitive). Useful for *\"what does this \
 crate pull in?\"* / *\"is X already a dep of Y?\"*. Reads `[dependencies]`, \
 `[dev-dependencies]`, `[build-dependencies]`, and target-gated sections from `Cargo.toml`.
@@ -305,8 +288,7 @@ crate pull in?\"* / *\"is X already a dep of Y?\"*. Reads `[dependencies]`, \
 Each row: `{name, kind: \"normal\"|\"dev\"|\"build\", req, optional, default_features, \
 features, target?}`. `target` is set when the dep is gated under \
 `[target.'cfg(...)'.dependencies]`. The name `dependency_tree` is aspirational — this is a \
-flat one-level list, not a recursive tree."
-    )]
+flat one-level list, not a recursive tree.")]
     async fn dependency_tree(
         &self,
         Parameters(args): Parameters<DependencyTreeArgs>,
@@ -314,8 +296,7 @@ flat one-level list, not a recursive tree."
         dependency_tree::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Return the crate's changelog content. Tries common filenames (`CHANGELOG.md`, `CHANGES.md`, \
 `HISTORY.md`, `NEWS.md`, and their extensionless variants) and returns the first that exists.
 
@@ -324,8 +305,7 @@ version string — best-effort heuristic against markdown heading syntax. Omit i
 full changelog.
 
 Use this for *\"what changed in 1.4?\"* / *\"any breaking changes between 0.7 and 0.8?\"* / \
-*\"is there a CHANGELOG?\"*."
-    )]
+*\"is there a CHANGELOG?\"*.")]
     async fn changelog(
         &self,
         Parameters(args): Parameters<ChangelogArgs>,
@@ -333,8 +313,7 @@ Use this for *\"what changed in 1.4?\"* / *\"any breaking changes between 0.7 an
         changelog::handle(&self.config, args).await
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 List `.rs` files under the crate's `examples/` directory. Many crates publish runnable \
 examples here — real working code is often more useful than doctest fragments.
 
@@ -342,8 +321,7 @@ Each row: `{path, name, content?}`. `name` is the file stem (or directory name f
 multi-file examples). `content` is only included when `include_content=true`.
 
 Use this for *\"show me how to use this crate\"* / *\"are there full working examples?\"* — \
-preferable to extracting doctests when the crate ships proper examples."
-    )]
+preferable to extracting doctests when the crate ships proper examples.")]
     async fn find_examples(
         &self,
         Parameters(args): Parameters<FindExamplesArgs>,

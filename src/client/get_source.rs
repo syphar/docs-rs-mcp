@@ -1,6 +1,6 @@
 use crate::{
     client::{dir_for_crate, download},
-    config::Config,
+    context::Config,
 };
 use anyhow::{Context as _, Result, bail};
 use flate2::read::GzDecoder;

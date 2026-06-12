@@ -1,6 +1,6 @@
 use crate::{
     client::{get_docs::get_docs, list_implementors},
-    config::Config,
+    context::Config,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -46,9 +46,8 @@ pub(crate) async fn handle(
 
     let path: Vec<String> = args.trait_path.split("::").map(str::to_string).collect();
 
-    let implementors = list_implementors::list_implementors(&docs, &path).ok_or_else(|| {
-        McpError::resource_not_found("no trait found at the given path", None)
-    })?;
+    let implementors = list_implementors::list_implementors(&docs, &path)
+        .ok_or_else(|| McpError::resource_not_found("no trait found at the given path", None))?;
 
     Ok(CallToolResult::structured(
         serde_json::to_value(ListImplementorsResult { implementors })

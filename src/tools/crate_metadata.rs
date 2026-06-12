@@ -1,4 +1,4 @@
-use crate::{client::crate_metadata, config::Config, types::semver::Version};
+use crate::{client::crate_metadata, context::Config, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

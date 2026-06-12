@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, config::Config};
+use crate::{client::get_source::fetch_cargo_manifest, context::Config};
 use anyhow::Result;
 use cargo_manifest::MaybeInherited;
 use serde::Serialize;

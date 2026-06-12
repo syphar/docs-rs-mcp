@@ -1,8 +1,4 @@
-use crate::{
-    client::inspect_feature_flags,
-    config::Config,
-    types::semver::Version,
-};
+use crate::{client::inspect_feature_flags, context::Config, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 

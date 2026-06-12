@@ -1,6 +1,6 @@
 use crate::{
     client::{get_docs::get_docs, list_impls},
-    config::Config,
+    context::Config,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};

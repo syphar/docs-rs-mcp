@@ -1,6 +1,6 @@
 use crate::{
     client::get_source::{fetch_source, parse_cargo_manifest},
-    config::Config,
+    context::Config,
 };
 use anyhow::Result;
 use serde::Serialize;

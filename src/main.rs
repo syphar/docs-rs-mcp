@@ -1,11 +1,11 @@
-use crate::{config::Config, server::DocsServer};
+use crate::{context::Config, server::DocsServer};
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_subscriber::{self, EnvFilter};
 
 mod client;
-mod config;
+mod context;
 mod server;
 #[cfg(test)]
 mod test_utils;
