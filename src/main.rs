@@ -4,7 +4,11 @@ use crate::{
 };
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 use tracing::{Instrument as _, error, info, info_span, level_filters::LevelFilter};
 use tracing_appender::rolling;
 use tracing_subscriber::{
@@ -24,16 +28,33 @@ mod types;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 
+/// Forces a `flush()` after every `write()`. We use it on the file layer so
+/// abrupt SIGKILL (e.g. from MCP clients tearing down the stdio child) doesn't
+/// strand log bytes in `RollingFileAppender`'s internal `BufWriter`.
+struct FlushOnWrite<W: io::Write>(W);
+
+impl<W: io::Write> io::Write for FlushOnWrite<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.0.write(buf)?;
+        self.0.flush()?;
+        Ok(n)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+}
+
 /// Initialize tracing with two sinks:
 ///   - stderr (compact, WARN+ by default) — for visibility during dev.
 ///     **Never** stdout: the MCP server speaks JSON-RPC over stdio, so any
 ///     stray byte to stdout corrupts the wire protocol.
 ///   - daily-rolled file under `<cache>/logs/`, JSON, INFO+ by default —
 ///     persistent record for later inspection. The PID is part of the
-///     filename so concurrent instances don't share a file.
+///     filename so concurrent instances don't share a file. Each event is
+///     flushed to disk immediately (see `FlushOnWrite`) so we survive
+///     SIGKILL with the log intact.
 ///
-/// Both layers honour `RUST_LOG` if set. The returned `WorkerGuard` must
-/// live for the program's lifetime so the non-blocking writer flushes.
+/// Both layers honour `RUST_LOG` if set.
 fn init_tracing(config: &Config) -> Result<()> {
     let pid = std::process::id();
     let file_appender = rolling::Builder::new()
@@ -53,10 +74,15 @@ fn init_tracing(config: &Config) -> Result<()> {
                 .parse_lossy("")
         }));
 
+    // Wrap in Mutex<FlushOnWrite<_>> so `MakeWriter` is satisfied and every
+    // event hits disk before write() returns. RollingFileAppender's own
+    // rollover logic still runs inside its Write impl.
+    let file_writer = Mutex::new(FlushOnWrite(file_appender));
+
     let file_layer = fmt::layer()
         .json()
         .with_ansi(false)
-        .with_writer(file_appender)
+        .with_writer(file_writer)
         // Emit one JSON line per span close, carrying `time.busy` /
         // `time.idle` durations. Combined with `#[tracing::instrument]` on
         // tool handlers, this gives you per-call timing data in the log.
