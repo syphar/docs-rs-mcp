@@ -2,6 +2,8 @@ use crate::{
     config::Config,
     tools::{
         get_item::{self, GetItemArgs},
+        list_implementors::{self, ListImplementorsArgs},
+        list_impls::{self, ListImplsArgs},
         list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
         resolve_version::{self, ResolveVersionArgs},
@@ -190,6 +192,9 @@ Limitations:
     `get_item` on the trait if you need them.
   - Only function-shaped items are returned (no associated consts/types).
 
+Related: `list_impls` returns the traits a type implements (no method bodies). \
+`list_implementors` is the inverse — types that implement a given trait.
+
 Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
     )]
     async fn list_methods(
@@ -197,6 +202,57 @@ Requires an exact `version` and uses the same `target` defaulting/fallback as ot
         Parameters(args): Parameters<ListMethodsArgs>,
     ) -> Result<CallToolResult, McpError> {
         list_methods::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+Answer *\"which traits does X implement?\"* / *\"what traits is X?\"*. Returns every trait \
+impl on the type at `type_path`, including auto-derived ones (`Send`/`Sync`/`Unpin`) and \
+blanket impls applied to it.
+
+Each row has:
+  - `trait_path`: path of the trait being implemented (e.g. `\"core::clone::Clone\"`)
+  - `generics`: the impl's generics (params, where-clauses)
+  - `is_synthetic`: auto-derived by the compiler (typically auto-traits)
+  - `is_blanket`: came from a blanket like `impl<T: Bound> Foo for T`
+
+`type_path` accepts canonical or re-export paths; the type must resolve to a \
+struct/enum/union/primitive (those are the kinds rustdoc records direct impls on). Use \
+`list_methods` if you want the method list instead of the trait list.
+
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
+    )]
+    async fn list_impls(
+        &self,
+        Parameters(args): Parameters<ListImplsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        list_impls::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+Answer *\"what implements this trait?\"* / *\"which types are X?\"*. The inverse of \
+`list_impls`. Returns every type that implements the trait at `trait_path` *within this \
+crate's rustdoc JSON*.
+
+Each row has:
+  - `type_path`: rendered path of the implementing type when it's a simple resolved path \
+    (e.g. `\"alloc::vec::Vec\"`); omitted for complex types like `&T`, tuples, or function \
+    pointers — inspect `for_type` then
+  - `for_type`: full structured rustdoc representation of the implementing type
+  - `generics`: the impl's generics
+
+Limitation: rustdoc JSON is single-crate. Implementations in *other* crates (e.g. a \
+downstream crate implementing this trait on its own type) are not visible here. To find \
+those you'd have to search those crates explicitly.
+
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
+    )]
+    async fn list_implementors(
+        &self,
+        Parameters(args): Parameters<ListImplementorsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        list_implementors::handle(&self.config, args).await
     }
 }
 
@@ -216,12 +272,16 @@ impl ServerHandler for DocsServer {
                  3. Drill in:\n   \
                     - `get_item(path)` — full record for one item: signature, docs, \
                       examples.\n   \
-                    - `list_methods(type_path)` — answers \"what methods does X have?\" \
-                      for a struct/enum/union/trait.\n   \
+                    - `list_methods(type_path)` — methods on a struct/enum/union.\n   \
+                    - `list_impls(type_path)` — traits a type implements.\n   \
+                    - `list_implementors(trait_path)` — types that implement a trait \
+                      (single-crate only).\n   \
                     - `list_module(path)` — recurse into a submodule.\n\
                  \n\
                  Match the tool to the question:\n   \
                  - \"what methods does X have\" / \"how do I use X\" → `list_methods`.\n   \
+                 - \"which traits does X implement\" / \"is X Send/Sync/...\" → `list_impls`.\n   \
+                 - \"what implements this trait\" / \"which types are X\" → `list_implementors`.\n   \
                  - \"what's in module X\" / \"what does X re-export\" → `list_module`.\n   \
                  - \"find X\" / \"is there a Y in this crate\" → `search_items`.\n   \
                  - \"show me X's signature/docs/examples\" → `get_item`.\n\
