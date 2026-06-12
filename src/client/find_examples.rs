@@ -33,16 +33,20 @@ pub(crate) async fn find_examples(
 
     let version = version.to_string();
     let source_dir = extract_source(&archive_path, krate, &version).await?;
+    let examples_dir = source_dir.join("examples");
+    if !examples_dir.exists() {
+        return Ok(None);
+    }
 
     let mut examples = Vec::new();
 
-    for entry in walkdir::WalkDir::new(source_dir.join("examples")) {
+    for entry in walkdir::WalkDir::new(&examples_dir) {
         let entry = entry?;
         if entry.path().extension().is_none_or(|e| e != "rs") {
             continue;
         }
 
-        let name = derive_example_name(entry.path());
+        let name = derive_example_name(entry.path().strip_prefix(&examples_dir)?);
         let content = if include_content {
             let content = std::fs::read(entry.path())?;
             Some(String::from_utf8_lossy(&content).into_owned())
@@ -64,14 +68,11 @@ fn derive_example_name(path: impl AsRef<Path>) -> String {
     // examples/foo.rs       -> "foo"
     // examples/foo/main.rs  -> "foo"
     // examples/foo/bar.rs   -> "foo/bar"
-    let mut components: Vec<&str> = path
+    let components: Vec<&str> = path
         .components()
         .filter_map(|c| c.as_os_str().to_str())
         .collect();
-    // Drop the leading "examples" segment.
-    if components.first() == Some(&"examples") {
-        components.remove(0);
-    }
+
     match components.as_slice() {
         [single] => single.trim_end_matches(".rs").to_string(),
         [dir, "main.rs"] => dir.to_string(),
@@ -100,12 +101,46 @@ mod tests {
         // The published `axum` crate doesn't ship its examples (those live in
         // the workspace at axum/examples/). So we expect an empty list, but
         // the lookup itself should succeed.
-        let examples = find_examples(env.config(), "axum", &version, false)
+        assert!(
+            find_examples(env.config(), "axum", &version, false)
+                .await?
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_itertools_examples() -> Result<()> {
+        let mut env = test_env().await?;
+        let version = semver::Version::new(0, 14, 0);
+        let fixture = crate::test_utils::fixture("itertools-0.14.0.crate")?;
+        let _mock = env
+            .server
+            .mock("GET", "/crates/itertools/itertools-0.14.0.crate")
+            .with_status(200)
+            .with_body_from_file(&fixture)
+            .create();
+
+        let examples = find_examples(env.config(), "itertools", &version, false)
             .await?
-            .expect("crate fetched");
-        // Just verify it didn't error; axum-0.8.9 may or may not contain
-        // examples in its .crate. Either way the call succeeds.
-        let _ = examples;
+            .expect("should have examples");
+
+        assert_eq!(examples.len(), 1);
+        let iris = &examples[0];
+        assert_eq!(iris.name, "iris");
+        assert!(iris.path.ends_with("/examples/iris.rs"));
+        assert!(
+            std::path::Path::new(&iris.path).is_absolute(),
+            "path should be absolute so the AI can read it directly"
+        );
+        assert!(iris.content.is_none(), "content omitted by default");
+
+        // With include_content=true, content is populated.
+        let with_content = find_examples(env.config(), "itertools", &version, true)
+            .await?
+            .expect("should have examples");
+        assert!(with_content[0].content.is_some());
+
         Ok(())
     }
 }
