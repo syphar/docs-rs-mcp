@@ -42,7 +42,13 @@ pub(crate) async fn dependency_tree(
     };
 
     let mut out = Vec::new();
-    collect_section(&cargo, "dependencies", DependencyKind::Normal, None, &mut out);
+    collect_section(
+        &cargo,
+        "dependencies",
+        DependencyKind::Normal,
+        None,
+        &mut out,
+    );
     collect_section(
         &cargo,
         "dev-dependencies",
@@ -119,10 +125,7 @@ fn collect_section(
                     .get("version")
                     .and_then(|v| v.as_str())
                     .map(str::to_string);
-                let optional = t
-                    .get("optional")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
+                let optional = t.get("optional").and_then(|v| v.as_bool()).unwrap_or(false);
                 let default_features = t
                     .get("default-features")
                     .and_then(|v| v.as_bool())
@@ -179,7 +182,7 @@ mod tests {
         let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
         // axum should depend on tokio, hyper, tower, etc.
         assert!(names.iter().any(|n| n.contains("axum-core")));
-        assert!(names.iter().any(|n| *n == "tower"));
+        assert!(names.contains(&"tower"));
         // Some are dev/build deps.
         assert!(deps.iter().any(|d| d.kind == DependencyKind::Dev));
 

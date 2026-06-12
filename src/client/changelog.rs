@@ -38,21 +38,20 @@ pub(crate) async fn changelog(
         return Ok(None);
     };
 
-    for candidate in CANDIDATES {
-        let Some(bytes) = fetch_from_source(&archive_path, candidate).await? else {
-            continue;
-        };
-        let text = String::from_utf8_lossy(&bytes).into_owned();
-        let content = match section_version {
-            Some(v) => extract_version_section(&text, v).unwrap_or(text),
-            None => text,
-        };
-        return Ok(Some(Changelog {
-            source_file: candidate.to_string(),
-            content,
-        }));
-    }
-    Ok(None)
+    let Some((candidate, bytes)) = fetch_from_source(&archive_path, CANDIDATES).await? else {
+        return Ok(None);
+    };
+
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    let content = match section_version {
+        Some(v) => extract_version_section(&text, v).unwrap_or(text),
+        None => text,
+    };
+
+    Ok(Some(Changelog {
+        source_file: candidate.display().to_string(),
+        content,
+    }))
 }
 
 /// Best-effort section extractor. Looks for a markdown heading containing the
@@ -60,10 +59,10 @@ pub(crate) async fn changelog(
 /// same or higher level. Heuristic — changelog formats vary. Returns `None`
 /// if no matching heading is found.
 fn extract_version_section(text: &str, version: &str) -> Option<String> {
-    let mut lines = text.lines().peekable();
+    let lines = text.lines().peekable();
     let mut start_level: Option<usize> = None;
     let mut captured = String::new();
-    while let Some(line) = lines.next() {
+    for line in lines {
         let level = heading_level(line);
         if start_level.is_none() {
             // Look for a heading line that mentions the version.
@@ -114,7 +113,7 @@ mod tests {
             .await?
             .expect("changelog present");
         assert_eq!(cl.source_file, "CHANGELOG.md");
-        assert!(cl.content.len() > 0);
+        assert!(!cl.content.is_empty());
         Ok(())
     }
 

@@ -2,7 +2,7 @@ use crate::{
     client::{dir_for_crate, download},
     config::Config,
 };
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use flate2::read::GzDecoder;
 use std::{
     fs::File,
@@ -52,12 +52,19 @@ pub(crate) async fn fetch_crate(
 /// matched against the archive entry path *with the top-level
 /// `<krate>-<version>/` prefix stripped*, so pass e.g. `"Cargo.toml"` or
 /// `"examples/hello.rs"`.
-pub(crate) async fn fetch_from_source(
+pub(crate) async fn fetch_from_source<P>(
     path: impl AsRef<Path>,
-    find_path: impl AsRef<Path>,
-) -> Result<Option<Vec<u8>>> {
+    find_paths: impl IntoIterator<Item = P>,
+) -> Result<Option<(PathBuf, Vec<u8>)>>
+where
+    P: AsRef<Path>,
+{
     let path = path.as_ref().to_path_buf();
-    let find_path = find_path.as_ref().to_path_buf();
+    let find_paths: Vec<_> = find_paths
+        .into_iter()
+        .map(|p| p.as_ref().to_path_buf())
+        .collect();
+
     spawn_blocking(move || -> Result<_> {
         let tar_gz = File::open(&path)
             .with_context(|| format!("opening crate archive {}", path.display()))?;
@@ -70,41 +77,45 @@ pub(crate) async fn fetch_from_source(
             let mut components = entry_path.components();
             let _root = components.next();
             let relative: PathBuf = components.collect();
-            if relative == Path::new(&find_path) {
-                let mut buf = Vec::with_capacity(entry.size() as usize);
-                entry.read_to_end(&mut buf)?;
-                return Ok(Some(buf));
+
+            for find_path in &find_paths {
+                if relative == find_path.as_path() {
+                    let mut buf = Vec::with_capacity(entry.size() as usize);
+                    entry.read_to_end(&mut buf)?;
+                    return Ok(Some((find_path.to_path_buf(), buf)));
+                }
             }
         }
-        return Ok(None);
+        Ok(None)
     })
     .await?
 }
 
-/// List archive entries whose path (with the leading `<krate>-<version>/`
-/// prefix stripped) starts with `prefix`. Returns the relative paths.
-pub(crate) async fn list_entries(
+pub(crate) async fn extract_source(
     path: impl AsRef<Path>,
-    prefix: impl AsRef<Path>,
-) -> Result<Vec<PathBuf>> {
+    name: &str,
+    version: &str,
+) -> Result<PathBuf> {
     let path = path.as_ref().to_path_buf();
-    let prefix = prefix.as_ref().to_path_buf();
-    spawn_blocking(move || -> Result<Vec<PathBuf>> {
+    let output_dir = path.parent().unwrap().join("extracted");
+    let source_path = output_dir.join(format!("{name}-{version}"));
+
+    spawn_blocking(move || -> Result<PathBuf> {
+        std::fs::create_dir_all(&output_dir)?;
+
         let tar_gz = File::open(&path)
             .with_context(|| format!("opening crate archive {}", path.display()))?;
         let mut archive = Archive::new(GzDecoder::new(tar_gz));
-        let mut out = Vec::new();
-        for entry in archive.entries()? {
-            let entry = entry?;
-            let entry_path = entry.path()?.to_path_buf();
-            let mut components = entry_path.components();
-            let _root = components.next();
-            let relative: PathBuf = components.collect();
-            if relative.starts_with(&prefix) {
-                out.push(relative);
-            }
-        }
-        Ok(out)
+        archive.unpack(&output_dir)?;
+
+        if !source_path.is_dir() {
+            bail!(
+                "broken crate archive, missing source directory {:?}",
+                source_path
+            );
+        };
+
+        Ok(source_path)
     })
     .await?
 }
@@ -119,7 +130,7 @@ pub(crate) async fn fetch_cargo_toml(
     let Some(archive_path) = fetch_crate(config, krate, version).await? else {
         return Ok(None);
     };
-    let Some(bytes) = fetch_from_source(&archive_path, "Cargo.toml").await? else {
+    let Some((_, bytes)) = fetch_from_source(&archive_path, ["Cargo.toml"]).await? else {
         return Ok(None);
     };
     let text = std::str::from_utf8(&bytes).context("Cargo.toml is not valid UTF-8")?;
@@ -155,7 +166,7 @@ mod tests {
 
         assert!(path.exists());
 
-        let cargo_toml = fetch_from_source(&path, "Cargo.toml")
+        let (_, cargo_toml) = fetch_from_source(&path, ["Cargo.toml"])
             .await?
             .expect("should exist");
 

@@ -1,10 +1,10 @@
 use crate::{
-    client::get_source::{fetch_crate, fetch_from_source, list_entries},
+    client::get_source::{extract_source, fetch_crate},
     config::Config,
 };
 use anyhow::Result;
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Example {
@@ -31,24 +31,26 @@ pub(crate) async fn find_examples(
         return Ok(None);
     };
 
-    let entries = list_entries(&archive_path, "examples").await?;
+    let version = version.to_string();
+    let source_dir = extract_source(&archive_path, krate, &version).await?;
+
     let mut examples = Vec::new();
-    for entry in entries {
-        // Only .rs files for now. Skip Cargo.toml of multi-file examples.
-        if entry.extension().and_then(|e| e.to_str()) != Some("rs") {
+
+    for entry in walkdir::WalkDir::new(source_dir.join("examples")) {
+        let entry = entry?;
+        if entry.path().extension().is_none_or(|e| e != "rs") {
             continue;
         }
-        let name = derive_example_name(&entry);
-        let path_str = entry.to_string_lossy().into_owned();
+
+        let name = derive_example_name(entry.path());
         let content = if include_content {
-            fetch_from_source(&archive_path, &entry)
-                .await?
-                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            let content = std::fs::read(entry.path())?;
+            Some(String::from_utf8_lossy(&content).into_owned())
         } else {
             None
         };
         examples.push(Example {
-            path: path_str,
+            path: std::path::absolute(entry.path())?.display().to_string(),
             name,
             content,
         });
@@ -57,7 +59,8 @@ pub(crate) async fn find_examples(
     Ok(Some(examples))
 }
 
-fn derive_example_name(path: &PathBuf) -> String {
+fn derive_example_name(path: impl AsRef<Path>) -> String {
+    let path = path.as_ref();
     // examples/foo.rs       -> "foo"
     // examples/foo/main.rs  -> "foo"
     // examples/foo/bar.rs   -> "foo/bar"
