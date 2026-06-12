@@ -434,7 +434,7 @@ pub(crate) fn unexpanded_external_globs(
     result
 }
 
-fn resolve_through_uses<'a>(
+pub(crate) fn resolve_through_uses<'a>(
     docs: &'a rustdoc_types::Crate,
     item: &'a rustdoc_types::Item,
 ) -> Option<&'a rustdoc_types::Item> {
@@ -459,7 +459,7 @@ fn join_path(prefix: &str, name: &str) -> String {
     }
 }
 
-fn reexport_info(docs: &rustdoc_types::Crate, target: &rustdoc_types::Item) -> Reexport {
+pub(crate) fn reexport_info(docs: &rustdoc_types::Crate, target: &rustdoc_types::Item) -> Reexport {
     if target.crate_id == 0 {
         return Reexport {
             source_crate: None,
@@ -475,7 +475,7 @@ fn reexport_info(docs: &rustdoc_types::Crate, target: &rustdoc_types::Item) -> R
     }
 }
 
-fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
+pub(crate) fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
     // Expected shape: https://docs.rs/<crate>/<version>/<crate>/
     let rest = url.strip_prefix("https://docs.rs/")?;
     let mut parts = rest.split('/');
