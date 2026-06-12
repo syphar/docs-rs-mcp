@@ -139,4 +139,30 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_list_traits() -> Result<()> {
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+
+        let results = search(&docs, None, Some(ItemKind::Trait), None);
+
+        assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
+
+        assert_eq!(
+            results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
+            vec![
+                "axum::extract::connect_info::Connected",
+                "axum::extract::ws::OnFailedUpgrade",
+                "axum::handler::Handler",
+                "axum::handler::HandlerWithoutStateExt",
+                "axum::middleware::map_request::IntoMapRequestResult",
+                "axum::middleware::map_request::private::Sealed",
+                "axum::serve::listener::Listener",
+                "axum::serve::listener::ListenerExt",
+                "axum::service_ext::ServiceExt",
+            ]
+        );
+
+        Ok(())
+    }
 }
