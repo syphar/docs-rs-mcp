@@ -58,9 +58,12 @@ To follow a re-export to its canonical definition, call `search_items` again wit
 `krate = reexport.source_crate` and `version = reexport.source_version` (use `resolve_version` \
 first if the version is missing). Repeat if that result is also a re-export.
 
+The response also includes `unexpanded_external_globs`: glob re-exports (`pub use foo::*`) \
+that pull from external crates. The server does not expand them — for each entry, follow up \
+with another `search_items` call against `source_crate` and `source_version`. Items found \
+there at path `P` are also reachable in the searched crate at `<prefix>::<P>`.
+
 Caveats:
-  - Glob re-exports of external crates (`pub use foo::*`) are expanded one level deep when the \
-    server can fetch the source crate's rustdoc; transitive globs may be incomplete.
   - Some paths surfaced here may go through private modules (importable name is the re-export, \
     not the canonical path).
   - `#[doc(hidden)]` items may appear — not part of the stable API."

@@ -30,7 +30,6 @@ pub(crate) struct Reexport {
 
 pub(crate) fn search(
     docs: &rustdoc_types::Crate,
-    externals: &HashMap<String, rustdoc_types::Crate>,
     query: Option<&str>,
     kind_filter: Option<ItemKind>,
     limit: Option<usize>,
@@ -72,13 +71,7 @@ pub(crate) fn search(
         })
         .collect();
 
-    collect_reexports(
-        docs,
-        externals,
-        query_lower.as_deref(),
-        kind_filter,
-        &mut matches,
-    );
+    collect_reexports(docs, query_lower.as_deref(), kind_filter, &mut matches);
 
     matches.sort_by(|left, right| {
         left.path
@@ -103,7 +96,6 @@ fn matches_query(query: Option<&str>, name: &str, path: &str) -> bool {
 
 fn collect_reexports(
     docs: &rustdoc_types::Crate,
-    externals: &HashMap<String, rustdoc_types::Crate>,
     query: Option<&str>,
     kind_filter: Option<ItemKind>,
     out: &mut Vec<Match>,
@@ -145,7 +137,6 @@ fn collect_reexports(
         let mut visited = HashSet::new();
         expand_use(
             docs,
-            externals,
             use_id,
             &parent_path,
             &mut visited,
@@ -158,7 +149,6 @@ fn collect_reexports(
 
 fn expand_use(
     docs: &rustdoc_types::Crate,
-    externals: &HashMap<String, rustdoc_types::Crate>,
     use_id: Id,
     prefix: &str,
     visited: &mut HashSet<Id>,
@@ -184,10 +174,9 @@ fn expand_use(
         // Target lives in an external crate.
         if !u.is_glob {
             emit_external_reexport(docs, target_id, &u.name, prefix, out, query, kind_filter);
-            return;
         }
-        // External glob: try to expand using a fetched external crate.
-        expand_external_glob(docs, externals, target_id, prefix, out, query, kind_filter);
+        // External globs are surfaced separately via `unexpanded_external_globs`;
+        // the caller (the AI) can follow up by searching the source crate.
         return;
     };
 
@@ -198,7 +187,6 @@ fn expand_use(
             let new_prefix = join_path(prefix, &u.name);
             expand_use(
                 docs,
-                externals,
                 target_id,
                 &new_prefix,
                 visited,
@@ -211,21 +199,11 @@ fn expand_use(
     }
 
     // Glob in-index: target must be a module. Enumerate its children at `prefix`.
-    expand_module(
-        docs,
-        externals,
-        target_id,
-        prefix,
-        visited,
-        out,
-        query,
-        kind_filter,
-    );
+    expand_module(docs, target_id, prefix, visited, out, query, kind_filter);
 }
 
 fn expand_module(
     docs: &rustdoc_types::Crate,
-    externals: &HashMap<String, rustdoc_types::Crate>,
     module_id: Id,
     prefix: &str,
     visited: &mut HashSet<Id>,
@@ -246,7 +224,6 @@ fn expand_module(
         if matches!(child.inner, ItemEnum::Use(_)) {
             expand_use(
                 docs,
-                externals,
                 *child_id,
                 prefix,
                 visited,
@@ -259,66 +236,6 @@ fn expand_module(
                 continue;
             };
             emit_reexport(docs, child, name, prefix, out, query, kind_filter);
-        }
-    }
-}
-
-fn expand_external_glob(
-    docs: &rustdoc_types::Crate,
-    externals: &HashMap<String, rustdoc_types::Crate>,
-    target_id: Id,
-    prefix: &str,
-    out: &mut Vec<Match>,
-    query: Option<&str>,
-    kind_filter: Option<ItemKind>,
-) {
-    let Some(summary) = docs.paths.get(&target_id) else {
-        return;
-    };
-    let Some(ext_crate) = docs.external_crates.get(&summary.crate_id) else {
-        return;
-    };
-    let Some(ext_docs) = externals.get(&ext_crate.name) else {
-        // External crate not fetched; we can't enumerate its items.
-        return;
-    };
-    // Find the equivalent module in the external crate by matching the path.
-    let Some(ext_module_id) = ext_docs
-        .paths
-        .iter()
-        .find_map(|(id, s)| (s.path == summary.path).then_some(*id))
-    else {
-        return;
-    };
-
-    let ext_name = ext_crate.name.clone();
-    let ext_version = ext_crate
-        .html_root_url
-        .as_deref()
-        .and_then(parse_version_from_docs_rs_url);
-
-    let len_before = out.len();
-    let mut ext_visited = HashSet::new();
-    expand_module(
-        ext_docs,
-        externals,
-        ext_module_id,
-        prefix,
-        &mut ext_visited,
-        out,
-        query,
-        kind_filter,
-    );
-
-    // Items native to the external crate come back with source_crate=None
-    // (their crate_id is 0 in the external's own namespace). Attribute them
-    // to the external crate we just enumerated.
-    for m in out[len_before..].iter_mut() {
-        if let Some(rx) = m.reexport.as_mut() {
-            if rx.source_crate.is_none() {
-                rx.source_crate = Some(ext_name.clone());
-                rx.source_version = ext_version.clone();
-            }
         }
     }
 }
@@ -388,50 +305,86 @@ fn emit_external_reexport(
     });
 }
 
-/// External crate referenced by a glob re-export whose target lives outside
-/// `docs.index`. To fully expand such a re-export you'd need to fetch this
-/// crate's own rustdoc JSON.
+/// A `pub use ...::*` glob in the searched crate that pulls items from an
+/// external crate. The server doesn't expand these — the caller (typically
+/// an AI) should call `search_items` again against `source_crate` /
+/// `source_version` to enumerate what's reachable through the glob.
+///
+/// Items from `source_crate` are reachable at `<prefix>::<item_name>`.
 #[derive(Debug, Serialize)]
-pub(crate) struct NeededCrate {
-    pub(crate) name: String,
-    /// Version parsed from `html_root_url` if it looks like a docs.rs URL.
-    /// `None` for stdlib, path/git deps, or unusual root URLs.
+pub(crate) struct UnexpandedExternalGlob {
+    /// Path of the module the glob sits in (e.g. `"axum::extract"` for
+    /// `pub use axum_core::*;` written inside `axum::extract`).
+    pub(crate) prefix: String,
+    /// Source crate the glob pulls from, in Rust identifier form (underscored).
+    /// For docs.rs lookups, replace `_` with `-`.
+    pub(crate) source_crate: String,
+    /// Version of `source_crate`, parsed from its `html_root_url`. `None` for
+    /// stdlib, path/git deps, or unusual root URLs — use `resolve_version` then.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) version: Option<String>,
-    /// Raw `html_root_url` from rustdoc, kept for debugging / non-docs.rs URLs.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) html_root_url: Option<String>,
+    pub(crate) source_version: Option<String>,
 }
 
-/// Crates whose rustdoc JSON would be needed to fully expand the glob
-/// re-exports of `docs` that target external crates.
-pub(crate) fn needed_crates(docs: &rustdoc_types::Crate) -> Vec<NeededCrate> {
-    let ids: HashSet<u32> = dbg!(
-        docs.index
-            .values()
-            .filter_map(|item| match &item.inner {
-                ItemEnum::Use(u) if u.is_glob => u.id,
-                _ => None,
-            })
-            .filter(|target_id| !docs.index.contains_key(target_id))
-            .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
-            .collect()
-    );
+/// Glob re-exports of external crates that this server doesn't expand
+/// in-place. One entry per glob occurrence (a single source crate may
+/// appear multiple times under different prefixes).
+pub(crate) fn unexpanded_external_globs(
+    docs: &rustdoc_types::Crate,
+) -> Vec<UnexpandedExternalGlob> {
+    let module_paths: HashMap<Id, String> = docs
+        .index
+        .iter()
+        .filter(|(_, item)| matches!(item.inner, ItemEnum::Module(_)))
+        .filter_map(|(id, _)| docs.paths.get(id).map(|s| (*id, s.path.join("::"))))
+        .collect();
 
-    let mut result: Vec<NeededCrate> = dbg!(
-        ids.into_iter()
-            .filter_map(|id| docs.external_crates.get(&id))
-            .map(|ec| NeededCrate {
-                name: ec.name.clone(),
-                version: ec
+    let mut parent_of: HashMap<Id, Id> = HashMap::new();
+    for item in docs.index.values() {
+        if let ItemEnum::Module(m) = &item.inner {
+            for child in &m.items {
+                parent_of.insert(*child, item.id);
+            }
+        }
+    }
+
+    let mut result: Vec<UnexpandedExternalGlob> = docs
+        .index
+        .iter()
+        .filter_map(|(use_id, item)| {
+            let ItemEnum::Use(u) = &item.inner else {
+                return None;
+            };
+            if !u.is_glob {
+                return None;
+            }
+            let target_id = u.id?;
+            // Only the unresolved (external) ones — in-index globs are expanded
+            // by `search` directly.
+            if docs.index.contains_key(&target_id) {
+                return None;
+            }
+            let summary = docs.paths.get(&target_id)?;
+            let ext = docs.external_crates.get(&summary.crate_id)?;
+            let prefix = parent_of
+                .get(use_id)
+                .and_then(|p| module_paths.get(p))
+                .cloned()
+                .unwrap_or_default();
+            Some(UnexpandedExternalGlob {
+                prefix,
+                source_crate: ext.name.clone(),
+                source_version: ext
                     .html_root_url
                     .as_deref()
                     .and_then(parse_version_from_docs_rs_url),
-                html_root_url: ec.html_root_url.clone(),
             })
-            .collect()
-    );
-    result.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.version.cmp(&b.version)));
+        })
+        .collect();
+    result.sort_by(|a, b| {
+        a.prefix
+            .cmp(&b.prefix)
+            .then_with(|| a.source_crate.cmp(&b.source_crate))
+    });
     result
 }
 
@@ -488,17 +441,15 @@ fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::Config, test_utils::docs_fixture, tools::search_items::fetch_needed_externals,
-    };
-    use anyhow::{Context as _, Result};
+    use crate::test_utils::docs_fixture;
+    use anyhow::Result;
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn test_list_modules() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let results = search(&docs, &HashMap::new(), None, Some(ItemKind::Module), None);
+        let results = search(&docs, None, Some(ItemKind::Module), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Module));
 
@@ -540,13 +491,7 @@ mod tests {
     async fn test_list_modules_filtered() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let results = search(
-            &docs,
-            &HashMap::new(),
-            Some("extract"),
-            Some(ItemKind::Module),
-            None,
-        );
+        let results = search(&docs, Some("extract"), Some(ItemKind::Module), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Module));
 
@@ -570,11 +515,8 @@ mod tests {
     #[tokio::test]
     async fn test_list_traits() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
-        let config = Config::from_env()?;
 
-        let externals = fetch_needed_externals(&config, &docs).await?;
-
-        let results = search(&docs, &externals, None, Some(ItemKind::Trait), None);
+        let results = search(&docs, None, Some(ItemKind::Trait), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
 
