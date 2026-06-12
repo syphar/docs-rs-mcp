@@ -1,4 +1,4 @@
-use crate::{config::Config, docs_rs::get_docs_status, semver_types::VersionReq};
+use crate::{client::status::get_docs_status, config::Config, semver_types::VersionReq};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

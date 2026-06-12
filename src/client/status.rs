@@ -43,7 +43,7 @@ mod tests {
         let version = semver::Version::new(1, 2, 3);
         let status = Status {
             doc_status: true,
-            version: version,
+            version,
         };
 
         let _mock = server

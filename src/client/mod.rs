@@ -1,3 +1,6 @@
+pub(crate) mod docs;
+pub(crate) mod status;
+
 use std::sync::LazyLock;
 
 const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"));
