@@ -6,10 +6,16 @@ use crate::{
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
-/// docs.rs's own default platform when no `?platform=` is given. Almost
-/// every published crate has docs built for this target, and it's where most
-/// Rust apps actually deploy.
-const DEFAULT_TARGET: &str = "x86_64-unknown-linux-gnu";
+/// The triple this binary was compiled for. In almost every case this is
+/// also the user's host machine (a Windows dev runs a Windows-compiled
+/// docs-rs-mcp), so it's a reasonable default — they'll see docs that match
+/// what they'd `use` on their own machine.
+const HOST_TARGET: &str = env!("BUILD_TARGET");
+
+/// docs.rs's own default platform when no `?platform=` is given. Every crate
+/// has a build for this target, so it's a reliable fallback when the host
+/// target wasn't built (most crates opt into the default only).
+const FALLBACK_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
@@ -35,13 +41,14 @@ pub(crate) struct SearchItemsArgs {
     pub(crate) limit: usize,
     /// Target triple to fetch docs for (e.g. `"x86_64-unknown-linux-gnu"`,
     /// `"aarch64-apple-darwin"`, `"x86_64-pc-windows-msvc"`). Defaults to
-    /// `x86_64-unknown-linux-gnu` — docs.rs's default and the most common
-    /// deployment target. Override when the user's project targets something
-    /// else (look at their `Cargo.toml` `[build] target = ...`, a
-    /// `.cargo/config.toml`, or whatever they've told you about deployment).
-    /// Target matters because `#[cfg(target_os = ...)]` items differ — using
-    /// the wrong target hides Linux-only `tokio::net::UnixListener` methods,
-    /// or surfaces Windows-only items that won't compile on Linux.
+    /// the host the server was compiled for — usually the user's machine.
+    /// Override when the user's project targets something different from
+    /// their host (look at `Cargo.toml [build] target`, `.cargo/config.toml`,
+    /// or whatever they've said about deployment). Common case: macOS dev
+    /// deploying to Linux — pass `"x86_64-unknown-linux-gnu"`.
+    /// Target matters because `#[cfg(target_os = ...)]` items differ —
+    /// `std::os::unix::*` only appears on Unix targets, `std::os::windows::*`
+    /// only on Windows, etc.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) target: Option<String>,
 }
@@ -65,16 +72,16 @@ pub(crate) async fn handle(
     config: &Config,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
-    let requested_target = args.target.as_deref().unwrap_or(DEFAULT_TARGET);
+    let requested_target = args.target.as_deref().unwrap_or(HOST_TARGET);
 
-    // Try the requested target first; if docs.rs doesn't have a build for it
-    // (404), fall back to DEFAULT_TARGET on the assumption that the crate's
-    // API is the same. Most crates only have the default target built.
+    // Try the requested target first; on 404 fall back to FALLBACK_TARGET
+    // (docs.rs's default platform), assuming the crate's API is the same
+    // across targets. Most crates only opt into the default build.
     let mut docs = get_docs(config, &args.krate, args.version.as_ref(), requested_target)
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
-    if docs.is_none() && requested_target != DEFAULT_TARGET {
-        docs = get_docs(config, &args.krate, args.version.as_ref(), DEFAULT_TARGET)
+    if docs.is_none() && requested_target != FALLBACK_TARGET {
+        docs = get_docs(config, &args.krate, args.version.as_ref(), FALLBACK_TARGET)
             .await
             .map_err(|err| McpError::internal_error(err.to_string(), None))?;
     }

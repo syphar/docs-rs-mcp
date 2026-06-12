@@ -42,14 +42,18 @@ impl DocsServer {
 Search rustdoc items for a crate version by name or path, optionally filtering by item kind.
 Requires an exact version — call `resolve_version` first if you only have a semver requirement.
 
-Defaults to fetching docs for `x86_64-unknown-linux-gnu` (docs.rs's default platform and the \
-most common deployment target). Override via the `target` arg when the user's project targets \
-something else — check their `Cargo.toml [build] target`, a `.cargo/config.toml`, or whatever \
-they've said about deployment. Using the wrong target hides items gated on `#[cfg(target_os = \
-...)]` and can surface items that won't compile on the real target.
+Defaults to fetching docs for the *host* target — the triple this server was compiled for, \
+which is almost always the user's own machine. So a Windows user gets Windows docs, a Linux \
+user gets Linux docs, etc.
 
-If docs.rs has no build for the requested `target` (most crates opt into only the default \
-target), the server falls back to `x86_64-unknown-linux-gnu` silently and returns those \
+Override via the `target` arg when the user's project targets something different from their \
+host (check `Cargo.toml [build] target`, `.cargo/config.toml`, or anything they've said about \
+deployment). The common case is macOS/Windows dev → Linux server deploy: pass \
+`target: \"x86_64-unknown-linux-gnu\"` then. Using the wrong target hides items gated on \
+`#[cfg(target_os = ...)]` and can surface items that won't compile on the real target.
+
+If docs.rs has no build for the requested `target` (most crates only opt into the default \
+build), the server falls back to `x86_64-unknown-linux-gnu` silently and returns those \
 results, assuming the crate's API is the same across targets. Cfg-gated items may then be \
 missing or extra — verify against the user's actual target if precision matters.
 
