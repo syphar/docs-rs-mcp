@@ -6,7 +6,7 @@ use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use std::path::{Path, PathBuf};
 use tracing::{Instrument as _, error, info, info_span, level_filters::LevelFilter};
-use tracing_appender::{non_blocking::WorkerGuard, rolling};
+use tracing_appender::rolling;
 use tracing_subscriber::{
     EnvFilter, Layer,
     fmt::{self, format::FmtSpan},
@@ -34,7 +34,7 @@ pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 ///
 /// Both layers honour `RUST_LOG` if set. The returned `WorkerGuard` must
 /// live for the program's lifetime so the non-blocking writer flushes.
-fn init_tracing(config: &Config) -> Result<WorkerGuard> {
+fn init_tracing(config: &Config) -> Result<()> {
     let pid = std::process::id();
     let file_appender = rolling::Builder::new()
         .rotation(rolling::Rotation::DAILY)
@@ -43,7 +43,6 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
         .filename_suffix("log")
         .max_log_files(10)
         .build(&config.log_dir)?;
-    let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     let stderr_layer = fmt::layer()
         .compact()
@@ -57,7 +56,7 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
     let file_layer = fmt::layer()
         .json()
         .with_ansi(false)
-        .with_writer(file_writer)
+        .with_writer(file_appender)
         // Emit one JSON line per span close, carrying `time.busy` /
         // `time.idle` durations. Combined with `#[tracing::instrument]` on
         // tool handlers, this gives you per-call timing data in the log.
@@ -73,7 +72,7 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
         .with(file_layer)
         .init();
 
-    Ok(guard)
+    Ok(())
 }
 
 /// Walk up from `start` looking for the nearest `Cargo.toml`. Returns the
@@ -123,13 +122,14 @@ fn log_instance_banner() {
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::from_env()?;
-    let _tracing_guard = init_tracing(&config)?;
+    init_tracing(&config)?;
     log_instance_banner();
     info!(log_dir = %config.log_dir.display(), "tracing initialized");
 
     let context = Context::new(config);
 
-    let span = info_span!("instance", pid = std::process::id());
+    let pid = std::process::id();
+    let span = info_span!("serve", pid);
 
     let service = DocsServer::new(context)
         .serve(stdio())
@@ -139,6 +139,7 @@ async fn main() -> Result<()> {
             error!(?e, "serving error");
         })?;
 
-    service.waiting().await?;
+    let wait = info_span!("wait", pid);
+    service.waiting().instrument(wait).await?;
     Ok(())
 }
