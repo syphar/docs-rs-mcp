@@ -7,6 +7,7 @@
 - in-memory cache with moka? perhaps using a reduced data structure?
 - in-memory cache for version-resolve? with X minutes expiration?
 - on-disk sqlite representation for faster queries?
+- try to locate .crate file in cargo cache? or even `/src/` cargo cache?
 
 ## mcp libs
 
