@@ -17,8 +17,11 @@ pub(crate) struct SearchItemsArgs {
     /// project, run `cargo tree -p <crate>` or `cargo pkgid <crate>` in the
     /// project directory, or read it from `Cargo.lock`.
     pub(crate) version: Version,
-    /// Search text matched against item names and paths.
-    pub(crate) query: String,
+    /// Optional search text matched against item names and paths
+    /// (case-insensitive substring match). Omit to return all items
+    /// (subject to `kind` and `limit`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) query: Option<String>,
     /// Optional item kind filter, e.g. "struct", "enum", "trait", "function", "module".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) kind: Option<ItemKind>,
@@ -44,7 +47,7 @@ pub(crate) async fn handle(
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 
-    let items = search_items::search(&docs, &args.query, args.kind, Some(args.limit));
+    let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
 
     Ok(CallToolResult::structured(
         serde_json::to_value(SearchItemsResult { items })
