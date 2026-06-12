@@ -3,13 +3,14 @@ use crate::{
     config::Config,
 };
 use anyhow::{Context as _, Result};
-use flate2::write::GzDecoder;
+use flate2::read::GzDecoder;
 use std::{
     fs::File,
+    io::Read as _,
     path::{Path, PathBuf},
 };
 use tar::Archive;
-use tokio::fs;
+use tokio::{fs, task::spawn_blocking};
 use tracing::debug;
 
 /// build a crate source download url.
@@ -47,31 +48,43 @@ async fn fetch_crate(
     Ok(Some(target_path))
 }
 
-async fn fetch_from_source(path: impl AsRef<Path>, find_path: &str) -> Result<Vec<u8>> {
-    let path = path.as_ref();
-
-    dbg!(&path);
-    let tar_gz = File::open(path)?;
-    let tar = GzDecoder::new(tar_gz);
-    let mut archive = Archive::new(tar);
-
-    for entry in archive.entries()? {
-        let entry = entry?;
-
-        //     dbg!(&entry.path());
-    }
-
-    panic!();
-    // archive.unpack(".")?;
-
-    Ok(vec![])
+/// Read one file out of a `.crate` archive (gzipped tar). `find_path` is
+/// matched against the archive entry path *with the top-level
+/// `<krate>-<version>/` prefix stripped*, so pass e.g. `"Cargo.toml"` or
+/// `"examples/hello.rs"`.
+async fn fetch_from_source(
+    path: impl AsRef<Path>,
+    find_path: impl AsRef<Path>,
+) -> Result<Option<Vec<u8>>> {
+    let path = path.as_ref().to_path_buf();
+    let find_path = find_path.as_ref().to_path_buf();
+    spawn_blocking(move || -> Result<_> {
+        let tar_gz = File::open(&path)
+            .with_context(|| format!("opening crate archive {}", path.display()))?;
+        let tar = GzDecoder::new(tar_gz);
+        let mut archive = Archive::new(tar);
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let entry_path = entry.path()?.to_path_buf();
+            // Strip the leading `<krate>-<version>/` component.
+            let mut components = entry_path.components();
+            let _root = components.next();
+            let relative: PathBuf = components.collect();
+            if relative == Path::new(&find_path) {
+                let mut buf = Vec::with_capacity(entry.size() as usize);
+                entry.read_to_end(&mut buf)?;
+                return Ok(Some(buf));
+            }
+        }
+        return Ok(None);
+    })
+    .await?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::{fixture, test_env};
-    use test_case::test_case;
 
     #[tokio::test]
     async fn test_success() -> Result<()> {
@@ -92,19 +105,17 @@ mod tests {
 
         let path = fetch_crate(env.config(), "axum", &version)
             .await?
-            .expect("expected docs to be present");
+            .expect("expected crate source to be present");
 
         assert!(path.exists());
 
-        let cargo_toml = fetch_from_source(&path, "Cargo.toml").await?;
+        let cargo_toml = fetch_from_source(&path, "Cargo.toml")
+            .await?
+            .expect("should exist");
 
-        // let file =
-
-        // assert_eq!(docs.crate_version, Some(version.to_string()));
-
-        // let root = &docs.paths[&docs.root];
-        // assert_eq!(root.path, vec!["axum"]);
-        // assert_eq!(root.kind, rustdoc_types::ItemKind::Module);
+        let cargo_toml = str::from_utf8(&cargo_toml)?;
+        assert!(cargo_toml.contains("name = \"axum\""));
+        assert!(cargo_toml.contains("version = \"0.8.9\""));
 
         Ok(())
     }
