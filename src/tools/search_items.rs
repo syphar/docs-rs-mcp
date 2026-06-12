@@ -7,7 +7,12 @@ use serde::Serialize;
 pub(crate) struct SearchItemsArgs {
     /// Name of the crate on crates.io / docs.rs.
     pub(crate) krate: String,
-    /// Concrete crate version to load rustdoc JSON for.
+    /// Exact crate version to load rustdoc JSON for (e.g. "1.2.3"). This is
+    /// not a semver requirement — ranges like "^1.2" or "*" are not accepted.
+    /// Use the `resolve_version` tool first to turn a requirement into a
+    /// concrete version. To find the version currently used in a local
+    /// project, run `cargo tree -p <crate>` or `cargo pkgid <crate>` in the
+    /// project directory, or read it from `Cargo.lock`.
     pub(crate) version: Version,
     /// Search text matched against item names and paths.
     pub(crate) query: String,

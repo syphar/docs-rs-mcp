@@ -38,7 +38,7 @@ impl DocsServer {
     }
 
     #[tool(
-        description = "Search rustdoc items for a crate version by name or path, optionally filtering by item kind."
+        description = "Search rustdoc items for a crate version by name or path, optionally filtering by item kind. Requires an exact version — call `resolve_version` first if you only have a semver requirement."
     )]
     async fn search_items(
         &self,
