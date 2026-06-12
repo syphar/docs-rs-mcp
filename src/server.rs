@@ -1,5 +1,5 @@
 use crate::{
-    context::Config,
+    context::Context,
     tools::{
         changelog::{self, ChangelogArgs},
         crate_metadata::{self, CrateMetadataArgs},
@@ -25,12 +25,12 @@ use rmcp::{
 pub struct DocsServer {
     #[allow(dead_code)]
     tool_router: ToolRouter<DocsServer>,
-    config: Config,
+    config: Context,
 }
 
 #[tool_router]
 impl DocsServer {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Context) -> Self {
         Self {
             tool_router: Self::tool_router(),
             config,

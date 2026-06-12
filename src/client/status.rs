@@ -1,4 +1,4 @@
-use crate::{client::CLIENT, context::Config};
+use crate::{client::CLIENT, context::Context};
 use anyhow::Result;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ pub(crate) struct Status {
 }
 
 pub(crate) async fn get_docs_status(
-    config: &Config,
+    config: &Context,
     krate: &str,
     req_version: impl Into<&semver::VersionReq>,
 ) -> Result<Option<Status>> {

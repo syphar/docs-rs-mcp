@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Config};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context};
 use anyhow::Result;
 use cargo_manifest::{Dependency as ManifestDep, DepsSet};
 use serde::Serialize;
@@ -40,7 +40,7 @@ pub(crate) struct Dependency {
 /// transitive crate). For each direct dep returns kind + version req + the
 /// flags that affect its build.
 pub(crate) async fn dependency_tree(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Dependency>>> {

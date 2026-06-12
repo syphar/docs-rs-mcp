@@ -1,6 +1,6 @@
 use crate::{
     client::{dir_for_crate, download},
-    context::Config,
+    context::Context,
 };
 use anyhow::{Context as _, Result};
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ pub(crate) fn build_download_url(krate: &str, version: &str, target: Option<&str
 }
 
 async fn fetch_rustdoc_json(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
@@ -62,7 +62,7 @@ async fn fetch_rustdoc_json(
 /// Returns `Ok(None)` only when even the crate's default build doesn't exist
 /// (typically: unknown crate or version).
 pub(crate) async fn get_docs(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,

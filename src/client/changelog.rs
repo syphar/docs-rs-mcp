@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_source, context::Config};
+use crate::{client::get_source::fetch_source, context::Context};
 use anyhow::Result;
 use serde::Serialize;
 
@@ -26,7 +26,7 @@ const CANDIDATES: &[&str] = &[
 /// order; the first one that exists wins. When `version` is `Some`, returns
 /// only the section for that version (best-effort heuristic — see code).
 pub(crate) async fn changelog(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
     section_version: Option<&str>,

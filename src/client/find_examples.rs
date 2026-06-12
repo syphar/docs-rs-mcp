@@ -1,6 +1,6 @@
 use crate::{
     client::get_source::{fetch_source, parse_cargo_manifest},
-    context::Config,
+    context::Context,
 };
 use anyhow::Result;
 use serde::Serialize;
@@ -27,7 +27,7 @@ pub(crate) struct Example {
 /// files, respecting `autoexamples = false`. Returns `None` if the crate has
 /// no examples (no `[[example]]` and no `examples/` directory).
 pub(crate) async fn find_examples(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
     include_content: bool,

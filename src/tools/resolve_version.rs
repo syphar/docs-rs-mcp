@@ -1,4 +1,4 @@
-use crate::{client::status::get_docs_status, context::Config, types::semver::VersionReq};
+use crate::{client::status::get_docs_status, context::Context, types::semver::VersionReq};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -14,7 +14,7 @@ pub(crate) struct ResolveVersionArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: ResolveVersionArgs,
 ) -> Result<CallToolResult, McpError> {
     let status = get_docs_status(config, &args.krate, args.req.as_ref())

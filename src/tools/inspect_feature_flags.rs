@@ -1,4 +1,4 @@
-use crate::{client::inspect_feature_flags, context::Config, types::semver::Version};
+use crate::{client::inspect_feature_flags, context::Context, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
@@ -17,7 +17,7 @@ struct InspectFeatureFlagsResult {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: InspectFeatureFlagsArgs,
 ) -> Result<CallToolResult, McpError> {
     let features =

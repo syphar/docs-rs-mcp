@@ -1,4 +1,4 @@
-use crate::{context::Config, server::DocsServer};
+use crate::{context::Context, server::DocsServer};
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing::{error, level_filters::LevelFilter};
@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let config = Config::from_env()?;
+    let config = Context::from_env()?;
 
     let service = DocsServer::new(config)
         .serve(stdio())

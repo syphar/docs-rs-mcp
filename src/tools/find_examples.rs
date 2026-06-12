@@ -1,4 +1,4 @@
-use crate::{client::find_examples, context::Config, types::semver::Version};
+use crate::{client::find_examples, context::Context, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
@@ -21,7 +21,7 @@ struct FindExamplesResult {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: FindExamplesArgs,
 ) -> Result<CallToolResult, McpError> {
     let examples = find_examples::find_examples(

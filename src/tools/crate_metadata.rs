@@ -1,4 +1,4 @@
-use crate::{client::crate_metadata, context::Config, types::semver::Version};
+use crate::{client::crate_metadata, context::Context, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -11,7 +11,7 @@ pub(crate) struct CrateMetadataArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: CrateMetadataArgs,
 ) -> Result<CallToolResult, McpError> {
     let meta = crate_metadata::crate_metadata(config, &args.krate, args.version.as_ref())

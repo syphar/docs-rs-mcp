@@ -1,4 +1,4 @@
-use crate::{client::changelog, context::Config, types::semver::Version};
+use crate::{client::changelog, context::Context, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -16,7 +16,7 @@ pub(crate) struct ChangelogArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: ChangelogArgs,
 ) -> Result<CallToolResult, McpError> {
     let cl = changelog::changelog(

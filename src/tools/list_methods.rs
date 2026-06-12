@@ -1,6 +1,6 @@
 use crate::{
     client::{get_docs::get_docs, list_methods},
-    context::Config,
+    context::Context,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -32,7 +32,7 @@ struct ListMethodsResult {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: ListMethodsArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);

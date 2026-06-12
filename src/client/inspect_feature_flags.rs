@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Config};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context};
 use anyhow::Result;
 use serde::Serialize;
 
@@ -15,7 +15,7 @@ pub(crate) struct Feature {
 }
 
 pub(crate) async fn inspect_feature_flags(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Feature>>> {

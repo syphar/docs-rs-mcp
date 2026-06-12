@@ -5,13 +5,13 @@ use std::{fs, path::PathBuf};
 
 use crate::APP_NAME;
 
-pub(crate) struct Config {
+pub(crate) struct Context {
     pub(crate) cache_dir: PathBuf,
     pub(crate) docs_rs_server: Url,
     pub(crate) static_crates_io: Url,
 }
 
-impl Config {
+impl Context {
     pub(crate) fn from_env() -> Result<Self> {
         let base_dirs = BaseDirs::new().ok_or_else(|| anyhow!("can't find cache dir"))?;
 

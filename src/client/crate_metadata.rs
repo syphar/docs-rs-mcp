@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Config};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context};
 use anyhow::Result;
 use cargo_manifest::MaybeInherited;
 use serde::Serialize;
@@ -42,7 +42,7 @@ fn local<T>(mi: Option<MaybeInherited<T>>) -> Option<T> {
 }
 
 pub(crate) async fn crate_metadata(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<CrateMetadata>> {

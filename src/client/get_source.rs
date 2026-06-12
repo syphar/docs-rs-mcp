@@ -1,6 +1,6 @@
 use crate::{
     client::{dir_for_crate, download},
-    context::Config,
+    context::Context,
 };
 use anyhow::{Context as _, Result, bail};
 use flate2::read::GzDecoder;
@@ -18,7 +18,7 @@ pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
 }
 
 pub(crate) async fn fetch_crate(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<PathBuf>> {
@@ -74,7 +74,7 @@ async fn extract_source(path: impl AsRef<Path>, name: &str, version: &str) -> Re
 }
 
 pub(crate) async fn fetch_source(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<PathBuf>> {
@@ -106,7 +106,7 @@ pub(crate) async fn parse_cargo_manifest(
 /// not shell out to `cargo`. Returns `Ok(None)` when the crate/version isn't
 /// on crates.io.
 pub(crate) async fn fetch_cargo_manifest(
-    config: &Config,
+    config: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<cargo_manifest::Manifest>> {

@@ -1,6 +1,6 @@
 use crate::{
     client::{get_docs::get_docs, search_items},
-    context::Config,
+    context::Context,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -74,7 +74,7 @@ struct SearchItemsResult {
 }
 
 pub(crate) async fn handle(
-    config: &Config,
+    config: &Context,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
