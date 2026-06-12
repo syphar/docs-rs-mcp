@@ -17,6 +17,7 @@ pub(crate) struct Context {
     config: Config,
     pub(crate) resolver_cache: Cache<semver::VersionReq, Arc<Option<Status>>>,
     pub(crate) rustdoc_json_cache: Cache<DocsKey, Option<Arc<rustdoc_types::Crate>>>,
+    pub(crate) cargo_manifest_cache: Cache<DocsKey, Arc<Option<cargo_manifest::Manifest>>>,
 }
 
 impl Context {
@@ -27,6 +28,7 @@ impl Context {
                 .time_to_live(config.resolver_cache_ttl)
                 .build(),
             rustdoc_json_cache: Cache::builder().build(),
+            cargo_manifest_cache: Cache::builder().build(),
             config,
         }
     }

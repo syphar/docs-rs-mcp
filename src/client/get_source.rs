@@ -1,12 +1,13 @@
 use crate::{
     client::{dir_for_crate, download},
-    context::Context,
+    context::{Context, DocsKey},
 };
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result, anyhow, bail};
 use flate2::read::GzDecoder;
 use std::{
     fs::File,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tar::Archive;
 use tokio::{fs, task::spawn_blocking};
@@ -23,7 +24,6 @@ pub(crate) async fn fetch_crate(
     version: &semver::Version,
 ) -> Result<Option<PathBuf>> {
     let config = context.config();
-    // TODO: optimization: use crate file in cargo cache, if it exists.
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate, &version);
@@ -107,15 +107,31 @@ pub(crate) async fn parse_cargo_manifest(
 /// not shell out to `cargo`. Returns `Ok(None)` when the crate/version isn't
 /// on crates.io.
 pub(crate) async fn fetch_cargo_manifest(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<cargo_manifest::Manifest>> {
-    let Some(source_dir) = fetch_source(config, krate, version).await? else {
-        return Ok(None);
+) -> Result<Arc<Option<cargo_manifest::Manifest>>> {
+    let key = DocsKey {
+        name: krate.to_string(),
+        version: version.to_owned(),
+        target: None,
     };
 
-    parse_cargo_manifest(&source_dir).await
+    let docs = context
+        .cargo_manifest_cache
+        .entry(key)
+        .or_try_insert_with::<_, anyhow::Error>(async move {
+            let Some(source_dir) = fetch_source(context, krate, version).await? else {
+                return Ok(Arc::new(None));
+            };
+
+            Ok(Arc::new(parse_cargo_manifest(&source_dir).await?))
+        })
+        .await
+        .map_err(|err| anyhow!(err))?
+        .into_value();
+
+    Ok(docs)
 }
 
 #[cfg(test)]

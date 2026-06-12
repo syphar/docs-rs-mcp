@@ -46,33 +46,37 @@ pub(crate) async fn crate_metadata(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<CrateMetadata>> {
-    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(context, krate, version)
+        .await?
+        .clone()
+        .as_ref()
+    else {
         return Ok(None);
     };
-    let Some(pkg) = manifest.package else {
+    let Some(pkg) = &manifest.package else {
         return Ok(None);
     };
 
-    let readme = local(pkg.readme).and_then(|s_or_b| match s_or_b {
+    let readme = local(pkg.readme.clone()).and_then(|s_or_b| match s_or_b {
         cargo_manifest::StringOrBool::String(s) => Some(s),
         cargo_manifest::StringOrBool::Bool(_) => None,
     });
 
     Ok(Some(CrateMetadata {
-        name: pkg.name,
-        version: local(pkg.version).unwrap_or_else(|| version.to_string()),
-        description: local(pkg.description),
-        repository: local(pkg.repository),
-        homepage: local(pkg.homepage),
-        documentation: local(pkg.documentation),
-        license: local(pkg.license),
-        license_file: local(pkg.license_file),
+        name: pkg.name.clone(),
+        version: local(pkg.version.clone()).unwrap_or_else(|| version.to_string()),
+        description: local(pkg.description.clone()),
+        repository: local(pkg.repository.clone()),
+        homepage: local(pkg.homepage.clone()),
+        documentation: local(pkg.documentation.clone()),
+        license: local(pkg.license.clone()),
+        license_file: local(pkg.license_file.clone()),
         readme,
-        rust_version: local(pkg.rust_version),
-        edition: local(pkg.edition).map(|e| e.as_str().to_string()),
-        authors: local(pkg.authors).unwrap_or_default(),
-        keywords: local(pkg.keywords).unwrap_or_default(),
-        categories: local(pkg.categories).unwrap_or_default(),
+        rust_version: local(pkg.rust_version.clone()),
+        edition: local(pkg.edition.clone()).map(|e| e.as_str().to_string()),
+        authors: local(pkg.authors.clone()).unwrap_or_default(),
+        keywords: local(pkg.keywords.clone()).unwrap_or_default(),
+        categories: local(pkg.categories.clone()).unwrap_or_default(),
     }))
 }
 
