@@ -9,13 +9,10 @@ use serde::Serialize;
 /// The triple this binary was compiled for. In almost every case this is
 /// also the user's host machine (a Windows dev runs a Windows-compiled
 /// docs-rs-mcp), so it's a reasonable default — they'll see docs that match
-/// what they'd `use` on their own machine.
+/// what they'd `use` on their own machine. `get_docs` falls back to
+/// `client::get_docs::FALLBACK_TARGET` automatically if docs.rs has no build
+/// for this host.
 const HOST_TARGET: &str = env!("BUILD_TARGET");
-
-/// docs.rs's own default platform when no `?platform=` is given. Every crate
-/// has a build for this target, so it's a reliable fallback when the host
-/// target wasn't built (most crates opt into the default only).
-const FALLBACK_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
@@ -72,22 +69,13 @@ pub(crate) async fn handle(
     config: &Config,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
-    let requested_target = args.target.as_deref().unwrap_or(HOST_TARGET);
-
-    // Try the requested target first; on 404 fall back to FALLBACK_TARGET
-    // (docs.rs's default platform), assuming the crate's API is the same
-    // across targets. Most crates only opt into the default build.
-    let mut docs = get_docs(config, &args.krate, args.version.as_ref(), requested_target)
+    let target = args.target.as_deref().unwrap_or(HOST_TARGET);
+    let docs = get_docs(config, &args.krate, args.version.as_ref(), Some(target))
         .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?;
-    if docs.is_none() && requested_target != FALLBACK_TARGET {
-        docs = get_docs(config, &args.krate, args.version.as_ref(), FALLBACK_TARGET)
-            .await
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?;
-    }
-    let docs = docs.ok_or_else(|| {
-        McpError::resource_not_found("crate or version not found on docs.rs", None)
-    })?;
+        .map_err(|err| McpError::internal_error(err.to_string(), None))?
+        .ok_or_else(|| {
+            McpError::resource_not_found("crate or version not found on docs.rs", None)
+        })?;
 
     let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
     let unexpanded_external_globs = search_items::unexpanded_external_globs(&docs);

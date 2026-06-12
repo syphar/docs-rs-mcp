@@ -14,8 +14,16 @@ use tokio::{
 use tokio_util::io::StreamReader;
 use tracing::debug;
 
-pub(crate) fn build_download_url(krate: &str, version: &str, target: &str) -> String {
-    format!("/crate/{krate}/{version}/{target}/json.zst")
+/// build a rustdoc json download url.
+///
+/// We don't know the default target of the crate, so without specific target,
+/// we leave it empty.
+pub(crate) fn build_download_url(krate: &str, version: &str, target: Option<&str>) -> String {
+    if let Some(target) = target {
+        format!("/crate/{krate}/{version}/{target}/json.zst")
+    } else {
+        format!("/crate/{krate}/{version}/json.zst")
+    }
 }
 
 /// standard method for crates.io index to get the folder for a crate,
@@ -37,14 +45,14 @@ async fn fetch_rustdoc_json(
     config: &Config,
     krate: &str,
     version: &semver::Version,
-    target: &str,
+    target: Option<&str>,
 ) -> Result<Option<PathBuf>> {
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
     let target_path = target_dir
         .join(&version)
-        .join(&target)
+        .join(target.as_deref().unwrap_or_else(|| "default_target"))
         .with_extension("json.zst");
 
     if fs::try_exists(&target_path).await? {
@@ -55,7 +63,7 @@ async fn fetch_rustdoc_json(
     fs::create_dir_all(&target_dir).await?;
     let url = config
         .docs_rs_server
-        .join(&build_download_url(krate, &version, &target))
+        .join(&build_download_url(krate, &version, target))
         .context("can't build download url")?;
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
@@ -67,17 +75,28 @@ async fn fetch_rustdoc_json(
     Ok(Some(target_path))
 }
 
-/// Returns `Ok(None)` when docs.rs has no build for this `(krate, version,
-/// target)` triple (404). Callers may want to retry with a more common
-/// target such as `x86_64-unknown-linux-gnu`.
+/// Fetch rustdoc JSON for `(krate, version, target)`. On a 404 for the
+/// requested `target`, transparently retries with [`FALLBACK_TARGET`] —
+/// assumes the crate's API is the same across targets, which is true for
+/// most crates that don't gate items on `#[cfg(target_os = ...)]`.
+///
+/// Returns `Ok(None)` only when even the fallback build doesn't exist
+/// (typically: unknown crate or version).
 pub(crate) async fn get_docs(
     config: &Config,
     krate: &str,
     version: &semver::Version,
-    target: &str,
+    target: Option<&str>,
 ) -> Result<Option<rustdoc_types::Crate>> {
-    let Some(path) = fetch_rustdoc_json(config, krate, version, target).await? else {
-        return Ok(None);
+    let path = match fetch_rustdoc_json(config, krate, version, target).await? {
+        Some(p) => p,
+        None if target.is_some() => {
+            let Some(p) = fetch_rustdoc_json(config, krate, version, None).await? else {
+                return Ok(None);
+            };
+            p
+        }
+        None => return Ok(None),
     };
 
     let krate = spawn_blocking(move || -> Result<_, anyhow::Error> {
@@ -115,11 +134,12 @@ async fn download(url: Url, target_path: &Path) -> Result<bool> {
 mod tests {
     use super::*;
     use crate::test_utils::{fixture, test_env};
-
-    const TEST_TARGET: &str = "x86_64-unknown-linux-gnu";
+    use test_case::test_case;
 
     #[tokio::test]
-    async fn test_success() -> Result<()> {
+    #[test_case(Some("test-target"))]
+    #[test_case(None)]
+    async fn test_success(target: Option<&str>) -> Result<()> {
         let mut env = test_env().await?;
 
         let version = semver::Version::new(0, 8, 9);
@@ -129,13 +149,13 @@ mod tests {
             .server
             .mock(
                 "GET",
-                build_download_url("axum", &version.to_string(), TEST_TARGET).as_str(),
+                build_download_url("axum", &version.to_string(), target).as_str(),
             )
             .with_status(200)
             .with_body_from_file(&fixure_path)
             .create();
 
-        let docs = get_docs(env.config(), "axum", &version, TEST_TARGET)
+        let docs = get_docs(env.config(), "axum", &version, target)
             .await?
             .expect("expected docs to be present");
         assert_eq!(docs.crate_version, Some(version.to_string()));
