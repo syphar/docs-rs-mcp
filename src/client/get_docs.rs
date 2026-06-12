@@ -52,7 +52,7 @@ async fn fetch_rustdoc_json(
     let target_dir = dir_for_crate(&config.cache_dir, krate);
     let target_path = target_dir
         .join(&version)
-        .join(target.as_deref().unwrap_or_else(|| "default_target"))
+        .join(target.unwrap_or("default_target"))
         .with_extension("json.zst");
 
     if fs::try_exists(&target_path).await? {
@@ -101,16 +101,17 @@ pub(crate) async fn get_docs(
         None => return Ok(None),
     };
 
-    let krate = spawn_blocking(move || -> Result<_, anyhow::Error> {
-        let file = std::fs::File::open(&path)?;
-        let reader = std::io::BufReader::new(file);
-        let decoder = zstd::stream::read::Decoder::new(reader)?;
-
-        Ok(serde_json::from_reader(decoder)?)
-    })
-    .await??;
+    let krate = spawn_blocking(move || parse_rustdoc_json(&path)).await??;
 
     Ok(Some(krate))
+}
+
+pub(crate) fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
+    let file = std::fs::File::open(&path)?;
+    let reader = std::io::BufReader::new(file);
+    let decoder = zstd::stream::read::Decoder::new(reader)?;
+
+    Ok(serde_json::from_reader(decoder)?)
 }
 
 /// `Ok(true)` on success, `Ok(false)` on 404. Other HTTP errors propagate.

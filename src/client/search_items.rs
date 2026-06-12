@@ -324,7 +324,7 @@ fn emit_external_reexport(
     let Some(summary) = docs.paths.get(&target_id) else {
         return;
     };
-    let kind: ItemKind = summary.kind.clone().into();
+    let kind: ItemKind = summary.kind.into();
     if kind_filter.is_some_and(|filter| filter != kind) {
         return;
     }

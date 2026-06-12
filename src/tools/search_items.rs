@@ -9,9 +9,9 @@ use serde::Serialize;
 /// The triple this binary was compiled for. In almost every case this is
 /// also the user's host machine (a Windows dev runs a Windows-compiled
 /// docs-rs-mcp), so it's a reasonable default — they'll see docs that match
-/// what they'd `use` on their own machine. `get_docs` falls back to
-/// `client::get_docs::FALLBACK_TARGET` automatically if docs.rs has no build
-/// for this host.
+/// what they'd `use` on their own machine. If docs.rs doesn't have a build
+/// for this host, `get_docs` falls back to the crate's docs.rs-default
+/// target automatically.
 const HOST_TARGET: &str = env!("BUILD_TARGET");
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]

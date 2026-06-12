@@ -1,9 +1,8 @@
-use crate::config::Config;
+use crate::{client::get_docs::parse_rustdoc_json, config::Config};
 use anyhow::{Result, bail};
-use async_compression::tokio::bufread::ZstdDecoder;
 use reqwest::Url;
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncReadExt as _;
+use tokio::task::spawn_blocking;
 
 pub(crate) struct TestEnv {
     config: Config,
@@ -46,16 +45,9 @@ pub(crate) fn fixture(path: impl AsRef<Path>) -> Result<PathBuf> {
 }
 
 pub(crate) async fn docs_fixture(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
-    use tokio::{fs, io};
-
     let path = fixture(path)?;
 
-    let file = fs::File::open(path).await?;
-    let reader = io::BufReader::new(file);
-    let mut decoder = ZstdDecoder::new(reader);
+    let krate = spawn_blocking(move || parse_rustdoc_json(&path)).await??;
 
-    let mut out = Vec::new();
-    decoder.read_to_end(&mut out).await?;
-
-    Ok(serde_json::from_slice(&out)?)
+    Ok(krate)
 }
