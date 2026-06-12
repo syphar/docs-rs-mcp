@@ -101,17 +101,19 @@ pub(crate) async fn get_docs(
         None => return Ok(None),
     };
 
-    let krate = spawn_blocking(move || parse_rustdoc_json(&path)).await??;
-
-    Ok(Some(krate))
+    Ok(Some(parse_rustdoc_json(&path).await?))
 }
 
-pub(crate) fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
-    let file = std::fs::File::open(&path)?;
-    let reader = std::io::BufReader::new(file);
-    let decoder = zstd::stream::read::Decoder::new(reader)?;
+pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
+    let path = path.as_ref().to_path_buf();
+    spawn_blocking(move || {
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+        let decoder = zstd::stream::read::Decoder::new(reader)?;
 
-    Ok(serde_json::from_reader(decoder)?)
+        Ok(serde_json::from_reader(decoder)?)
+    })
+    .await?
 }
 
 /// `Ok(true)` on success, `Ok(false)` on 404. Other HTTP errors propagate.

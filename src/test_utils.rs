@@ -2,7 +2,6 @@ use crate::{client::get_docs::parse_rustdoc_json, config::Config};
 use anyhow::{Result, bail};
 use reqwest::Url;
 use std::path::{Path, PathBuf};
-use tokio::task::spawn_blocking;
 
 pub(crate) struct TestEnv {
     config: Config,
@@ -47,7 +46,5 @@ pub(crate) fn fixture(path: impl AsRef<Path>) -> Result<PathBuf> {
 pub(crate) async fn docs_fixture(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
     let path = fixture(path)?;
 
-    let krate = spawn_blocking(move || parse_rustdoc_json(&path)).await??;
-
-    Ok(krate)
+    parse_rustdoc_json(&path).await
 }
