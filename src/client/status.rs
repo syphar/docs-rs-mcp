@@ -35,11 +35,11 @@ pub(crate) async fn get_docs_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqwest::Url;
+    use crate::test_utils::test_env;
 
     #[tokio::test]
     async fn test_success() -> Result<()> {
-        let mut server = mockito::Server::new_async().await;
+        let mut env = test_env().await?;
 
         let version = semver::Version::new(1, 2, 3);
         let status = Status {
@@ -47,21 +47,17 @@ mod tests {
             version,
         };
 
-        let _mock = server
+        let _mock = env
+            .server
             .mock("GET", "/crate/itertools/^1.2.3/status.json")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(serde_json::to_string(&status)?)
             .create();
 
-        let config = Config {
-            cache_dir: tempfile::tempdir()?.keep(),
-            docs_rs_server: Url::parse(&server.url()).unwrap(),
-        };
-
         assert_eq!(
             get_docs_status(
-                &config,
+                env.config(),
                 "itertools",
                 &semver::VersionReq::parse("1.2.3").unwrap(),
             )

@@ -1,14 +1,15 @@
+use crate::{config::Config, server::DocsServer};
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_subscriber::{self, EnvFilter};
 
-use crate::{config::Config, server::DocsServer};
-
 mod client;
 mod config;
 mod semver_types;
 mod server;
+#[cfg(test)]
+mod test_utils;
 mod tools;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
