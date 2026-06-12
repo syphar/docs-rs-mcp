@@ -19,9 +19,11 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
     let server = mockito::Server::new_async().await;
 
     let cache_dir = tempfile::TempDir::new()?;
+    let server_url = Url::parse(&server.url()).unwrap();
     let config = Config {
         cache_dir: cache_dir.path().to_path_buf(),
-        docs_rs_server: Url::parse(&server.url()).unwrap(),
+        docs_rs_server: server_url.clone(),
+        static_crates_io: server_url.clone(),
     };
 
     Ok(TestEnv {

@@ -8,6 +8,7 @@ use crate::APP_NAME;
 pub(crate) struct Config {
     pub(crate) cache_dir: PathBuf,
     pub(crate) docs_rs_server: Url,
+    pub(crate) static_crates_io: Url,
 }
 
 impl Config {
@@ -20,6 +21,7 @@ impl Config {
         Ok(Self {
             cache_dir,
             docs_rs_server: Url::parse("https://docs.rs")?,
+            static_crates_io: Url::parse("https://static.crates.io")?,
         })
     }
 }

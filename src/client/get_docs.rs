@@ -1,17 +1,10 @@
-use crate::{client::CLIENT, config::Config};
+use crate::{
+    client::{dir_for_crate, download},
+    config::Config,
+};
 use anyhow::{Context as _, Result};
-use futures_util::TryStreamExt;
-use reqwest::{StatusCode, Url};
-use std::{
-    io,
-    path::{Path, PathBuf},
-};
-use tokio::{
-    fs::{self, File},
-    io::AsyncWriteExt,
-    task::spawn_blocking,
-};
-use tokio_util::io::StreamReader;
+use std::path::{Path, PathBuf};
+use tokio::{fs, task::spawn_blocking};
 use tracing::debug;
 
 /// build a rustdoc json download url.
@@ -26,21 +19,6 @@ pub(crate) fn build_download_url(krate: &str, version: &str, target: Option<&str
     }
 }
 
-/// standard method for crates.io index to get the folder for a crate,
-/// given a crate name.
-fn dir_for_crate(output_path: &Path, name: &str) -> PathBuf {
-    let mut path = output_path.to_owned();
-    let name_lower = name.to_ascii_lowercase();
-    match name_lower.len() {
-        1 => path.push("1"),
-        2 => path.push("2"),
-        3 => path.extend(["3", &name_lower[..1]]),
-        _ => path.extend([&name_lower[0..2], &name_lower[2..4]]),
-    }
-    path.push(name_lower);
-    path
-}
-
 async fn fetch_rustdoc_json(
     config: &Config,
     krate: &str,
@@ -49,7 +27,7 @@ async fn fetch_rustdoc_json(
 ) -> Result<Option<PathBuf>> {
     let version = version.to_string();
 
-    let target_dir = dir_for_crate(&config.cache_dir, krate).join(&version);
+    let target_dir = dir_for_crate(&config.cache_dir, krate, &version);
     let target_path = target_dir
         .join(target.unwrap_or("default_target"))
         .with_extension("json.zst");
@@ -113,25 +91,6 @@ pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc
         Ok(serde_json::from_reader(decoder)?)
     })
     .await?
-}
-
-/// `Ok(true)` on success, `Ok(false)` on 404. Other HTTP errors propagate.
-async fn download(url: Url, target_path: &Path) -> Result<bool> {
-    let response = CLIENT.get(url).send().await?;
-    if response.status() == StatusCode::NOT_FOUND {
-        return Ok(false);
-    }
-    let response = response.error_for_status()?;
-
-    let stream = response.bytes_stream().map_err(io::Error::other);
-
-    let mut reader = StreamReader::new(stream);
-    let mut file = File::create(target_path).await?;
-
-    tokio::io::copy(&mut reader, &mut file).await?;
-    file.flush().await?;
-
-    Ok(true)
 }
 
 #[cfg(test)]
