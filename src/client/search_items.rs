@@ -14,7 +14,7 @@ pub(crate) fn search(
     docs: &rustdoc_types::Crate,
     query: &str,
     kind_filter: Option<ItemKind>,
-    limit: usize,
+    limit: Option<usize>,
 ) -> Vec<Match> {
     let query = query.to_lowercase();
 
@@ -50,6 +50,10 @@ pub(crate) fn search(
             .then_with(|| left.kind.cmp(&right.kind))
             .then_with(|| left.id.cmp(&right.id))
     });
-    matches.truncate(limit);
+
+    if let Some(limit) = limit {
+        matches.truncate(limit);
+    }
+
     matches
 }

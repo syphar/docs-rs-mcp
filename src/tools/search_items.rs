@@ -44,7 +44,7 @@ pub(crate) async fn handle(
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 
-    let items = search_items::search(&docs, &args.query, args.kind, args.limit);
+    let items = search_items::search(&docs, &args.query, args.kind, Some(args.limit));
 
     Ok(CallToolResult::structured(
         serde_json::to_value(SearchItemsResult { items })
