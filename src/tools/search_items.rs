@@ -3,8 +3,10 @@ use crate::{
     config::Config,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
+use futures_util::future::join_all;
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
@@ -47,10 +49,43 @@ pub(crate) async fn handle(
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 
-    let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
+    let externals = fetch_needed_externals(config, &docs).await;
+
+    let items = search_items::search(
+        &docs,
+        &externals,
+        args.query.as_deref(),
+        args.kind,
+        Some(args.limit),
+    );
 
     Ok(CallToolResult::structured(
         serde_json::to_value(SearchItemsResult { items })
             .map_err(|err| McpError::internal_error(err.to_string(), None))?,
     ))
+}
+
+/// Best-effort: fetch every external crate flagged by `needed_crates` so
+/// glob re-exports can be expanded. Failures are swallowed (we still return
+/// the matches we can compute from the main crate alone).
+async fn fetch_needed_externals(
+    config: &Config,
+    docs: &rustdoc_types::Crate,
+) -> HashMap<String, rustdoc_types::Crate> {
+    let needed = search_items::needed_crates(docs);
+
+    let fetches = needed.into_iter().filter_map(|nc| {
+        let version: semver::Version = nc.version.as_deref()?.parse().ok()?;
+        // rustdoc gives crate names in Rust identifier form (underscored);
+        // docs.rs URLs use the crates.io name (hyphenated).
+        let url_name = nc.name.replace('_', "-");
+        Some(async move {
+            get_docs(config, &url_name, &version)
+                .await
+                .ok()
+                .map(|d| (nc.name, d))
+        })
+    });
+
+    join_all(fetches).await.into_iter().flatten().collect()
 }

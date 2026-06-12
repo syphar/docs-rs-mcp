@@ -30,6 +30,7 @@ pub(crate) struct Reexport {
 
 pub(crate) fn search(
     docs: &rustdoc_types::Crate,
+    externals: &HashMap<String, rustdoc_types::Crate>,
     query: Option<&str>,
     kind_filter: Option<ItemKind>,
     limit: Option<usize>,
@@ -71,7 +72,13 @@ pub(crate) fn search(
         })
         .collect();
 
-    collect_reexports(docs, query_lower.as_deref(), kind_filter, &mut matches);
+    collect_reexports(
+        docs,
+        externals,
+        query_lower.as_deref(),
+        kind_filter,
+        &mut matches,
+    );
 
     matches.sort_by(|left, right| {
         left.path
@@ -96,6 +103,7 @@ fn matches_query(query: Option<&str>, name: &str, path: &str) -> bool {
 
 fn collect_reexports(
     docs: &rustdoc_types::Crate,
+    externals: &HashMap<String, rustdoc_types::Crate>,
     query: Option<&str>,
     kind_filter: Option<ItemKind>,
     out: &mut Vec<Match>,
@@ -137,6 +145,7 @@ fn collect_reexports(
         let mut visited = HashSet::new();
         expand_use(
             docs,
+            externals,
             use_id,
             &parent_path,
             &mut visited,
@@ -149,6 +158,7 @@ fn collect_reexports(
 
 fn expand_use(
     docs: &rustdoc_types::Crate,
+    externals: &HashMap<String, rustdoc_types::Crate>,
     use_id: Id,
     prefix: &str,
     visited: &mut HashSet<Id>,
@@ -171,12 +181,21 @@ fn expand_use(
         return;
     };
     let Some(target) = docs.index.get(&target_id) else {
-        // Target lives in an external crate — not in `index`, but usually
-        // present in `paths`. Emit from the path summary (no glob expansion
-        // possible because we don't have the source crate's items).
+        // Target lives in an external crate.
         if !u.is_glob {
             emit_external_reexport(docs, target_id, &u.name, prefix, out, query, kind_filter);
+            return;
         }
+        // External glob: try to expand using a fetched external crate.
+        expand_external_glob(
+            docs,
+            externals,
+            target_id,
+            prefix,
+            out,
+            query,
+            kind_filter,
+        );
         return;
     };
 
@@ -187,6 +206,7 @@ fn expand_use(
             let new_prefix = join_path(prefix, &u.name);
             expand_use(
                 docs,
+                externals,
                 target_id,
                 &new_prefix,
                 visited,
@@ -198,8 +218,33 @@ fn expand_use(
         return;
     }
 
-    // Glob: target must be a module. Enumerate its children at `prefix`.
-    let ItemEnum::Module(m) = &target.inner else {
+    // Glob in-index: target must be a module. Enumerate its children at `prefix`.
+    expand_module(
+        docs,
+        externals,
+        target_id,
+        prefix,
+        visited,
+        out,
+        query,
+        kind_filter,
+    );
+}
+
+fn expand_module(
+    docs: &rustdoc_types::Crate,
+    externals: &HashMap<String, rustdoc_types::Crate>,
+    module_id: Id,
+    prefix: &str,
+    visited: &mut HashSet<Id>,
+    out: &mut Vec<Match>,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+) {
+    let Some(item) = docs.index.get(&module_id) else {
+        return;
+    };
+    let ItemEnum::Module(m) = &item.inner else {
         return;
     };
     for child_id in &m.items {
@@ -207,12 +252,81 @@ fn expand_use(
             continue;
         };
         if matches!(child.inner, ItemEnum::Use(_)) {
-            expand_use(docs, *child_id, prefix, visited, out, query, kind_filter);
+            expand_use(
+                docs,
+                externals,
+                *child_id,
+                prefix,
+                visited,
+                out,
+                query,
+                kind_filter,
+            );
         } else {
             let Some(name) = child.name.as_deref() else {
                 continue;
             };
             emit_reexport(docs, child, name, prefix, out, query, kind_filter);
+        }
+    }
+}
+
+fn expand_external_glob(
+    docs: &rustdoc_types::Crate,
+    externals: &HashMap<String, rustdoc_types::Crate>,
+    target_id: Id,
+    prefix: &str,
+    out: &mut Vec<Match>,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+) {
+    let Some(summary) = docs.paths.get(&target_id) else {
+        return;
+    };
+    let Some(ext_crate) = docs.external_crates.get(&summary.crate_id) else {
+        return;
+    };
+    let Some(ext_docs) = externals.get(&ext_crate.name) else {
+        // External crate not fetched; we can't enumerate its items.
+        return;
+    };
+    // Find the equivalent module in the external crate by matching the path.
+    let Some(ext_module_id) = ext_docs
+        .paths
+        .iter()
+        .find_map(|(id, s)| (s.path == summary.path).then_some(*id))
+    else {
+        return;
+    };
+
+    let ext_name = ext_crate.name.clone();
+    let ext_version = ext_crate
+        .html_root_url
+        .as_deref()
+        .and_then(parse_version_from_docs_rs_url);
+
+    let len_before = out.len();
+    let mut ext_visited = HashSet::new();
+    expand_module(
+        ext_docs,
+        externals,
+        ext_module_id,
+        prefix,
+        &mut ext_visited,
+        out,
+        query,
+        kind_filter,
+    );
+
+    // Items native to the external crate come back with source_crate=None
+    // (their crate_id is 0 in the external's own namespace). Attribute them
+    // to the external crate we just enumerated.
+    for m in out[len_before..].iter_mut() {
+        if let Some(rx) = m.reexport.as_mut() {
+            if rx.source_crate.is_none() {
+                rx.source_crate = Some(ext_name.clone());
+                rx.source_version = ext_version.clone();
+            }
         }
     }
 }
@@ -388,7 +502,7 @@ mod tests {
     async fn test_list_modules() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let results = search(&docs, None, Some(ItemKind::Module), None);
+        let results = search(&docs, &HashMap::new(), None, Some(ItemKind::Module), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Module));
 
@@ -430,7 +544,13 @@ mod tests {
     async fn test_list_modules_filtered() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
-        let results = search(&docs, Some("extract"), Some(ItemKind::Module), None);
+        let results = search(
+            &docs,
+            &HashMap::new(),
+            Some("extract"),
+            Some(ItemKind::Module),
+            None,
+        );
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Module));
 
@@ -469,7 +589,7 @@ mod tests {
 
         dbg!(&needed);
 
-        let results = search(&docs, None, Some(ItemKind::Trait), None);
+        let results = search(&docs, &HashMap::new(), None, Some(ItemKind::Trait), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
 
