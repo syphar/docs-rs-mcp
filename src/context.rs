@@ -52,7 +52,7 @@ impl Config {
         let cache_dir = base_dirs.cache_dir().join(APP_NAME);
         fs::create_dir_all(&cache_dir)?;
 
-        let log_dir = cache_dir.join("logs");
+        let log_dir = cache_dir.join("_logs");
         fs::create_dir_all(&log_dir)?;
 
         Ok(Self {

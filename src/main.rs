@@ -32,6 +32,7 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
         .rotation(rolling::Rotation::DAILY)
         .filename_prefix(APP_NAME)
         .filename_suffix("log")
+        .max_log_files(10)
         .build(&config.log_dir)?;
     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
