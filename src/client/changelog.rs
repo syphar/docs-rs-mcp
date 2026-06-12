@@ -73,6 +73,7 @@ fn extract_version_section(text: &str, version: &str) -> Option<String> {
             }
         } else {
             // Capturing — stop at the next heading at the same-or-higher level.
+            #[allow(clippy::unnecessary_unwrap)]
             if let Some(lvl) = level
                 && lvl <= start_level.unwrap()
             {
