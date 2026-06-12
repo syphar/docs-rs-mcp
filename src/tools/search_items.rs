@@ -1,6 +1,6 @@
 use crate::{
     client::{
-        docs::get_docs,
+        get_docs::get_docs,
         search_items::{SearchItemMatch, search_items},
     },
     config::Config,
