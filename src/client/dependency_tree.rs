@@ -44,7 +44,8 @@ pub(crate) async fn dependency_tree(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Dependency>>> {
-    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
+    let arc = fetch_cargo_manifest(context, krate, version).await?;
+    let Some(manifest) = arc.as_ref() else {
         return Ok(None);
     };
 

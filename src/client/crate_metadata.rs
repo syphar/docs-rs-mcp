@@ -46,14 +46,11 @@ pub(crate) async fn crate_metadata(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<CrateMetadata>> {
-    let Some(manifest) = fetch_cargo_manifest(context, krate, version)
-        .await?
-        .clone()
-        .as_ref()
-    else {
+    let arc = fetch_cargo_manifest(context, krate, version).await?;
+    let Some(manifest) = arc.as_ref() else {
         return Ok(None);
     };
-    let Some(pkg) = &manifest.package else {
+    let Some(pkg) = manifest.package.as_ref() else {
         return Ok(None);
     };
 

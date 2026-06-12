@@ -19,10 +19,11 @@ pub(crate) async fn inspect_feature_flags(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Feature>>> {
-    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
+    let arc = fetch_cargo_manifest(context, krate, version).await?;
+    let Some(manifest) = arc.as_ref() else {
         return Ok(None);
     };
-    let Some(mut features) = manifest.features else {
+    let Some(mut features) = manifest.features.clone() else {
         return Ok(Some(Vec::new()));
     };
 
