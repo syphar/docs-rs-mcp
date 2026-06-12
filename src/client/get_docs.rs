@@ -1,9 +1,12 @@
 use crate::{
     client::{dir_for_crate, download},
-    context::Context,
+    context::{Context, DocsKey},
 };
-use anyhow::{Context as _, Result};
-use std::path::{Path, PathBuf};
+use anyhow::{Context as _, Result, anyhow};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::{fs, task::spawn_blocking};
 use tracing::debug;
 
@@ -63,23 +66,39 @@ async fn fetch_rustdoc_json(
 /// Returns `Ok(None)` only when even the crate's default build doesn't exist
 /// (typically: unknown crate or version).
 pub(crate) async fn get_docs(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
-) -> Result<Option<rustdoc_types::Crate>> {
-    let path = match fetch_rustdoc_json(config, krate, version, target).await? {
-        Some(p) => p,
-        None if target.is_some() => {
-            let Some(p) = fetch_rustdoc_json(config, krate, version, None).await? else {
-                return Ok(None);
-            };
-            p
-        }
-        None => return Ok(None),
+) -> Result<Option<Arc<rustdoc_types::Crate>>> {
+    let key = DocsKey {
+        name: krate.to_string(),
+        version: version.to_owned(),
+        target: target.map(|t| t.to_string()),
     };
 
-    Ok(Some(parse_rustdoc_json(&path).await?))
+    let docs = context
+        .rustdoc_json_cache
+        .entry(key)
+        .or_try_insert_with::<_, anyhow::Error>(async move {
+            let path = match fetch_rustdoc_json(context, krate, version, target).await? {
+                Some(p) => p,
+                None if target.is_some() => {
+                    let Some(p) = fetch_rustdoc_json(context, krate, version, None).await? else {
+                        return Ok(None);
+                    };
+                    p
+                }
+                None => return Ok(None),
+            };
+
+            Ok(Some(Arc::new(parse_rustdoc_json(&path).await?)))
+        })
+        .await
+        .map_err(|err| anyhow!(err))?
+        .into_value();
+
+    Ok(docs)
 }
 
 pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {

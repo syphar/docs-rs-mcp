@@ -6,10 +6,17 @@ use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
 use crate::{APP_NAME, client::status::Status};
 
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct DocsKey {
+    pub(crate) name: String,
+    pub(crate) version: semver::Version,
+    pub(crate) target: Option<String>,
+}
+
 pub(crate) struct Context {
     config: Config,
     pub(crate) resolver_cache: Cache<semver::VersionReq, Arc<Option<Status>>>,
-    pub(crate) rustdoc_json_cache: Cache<(String, semver::Version), Arc<rustdoc_types::Crate>>,
+    pub(crate) rustdoc_json_cache: Cache<DocsKey, Option<Arc<rustdoc_types::Crate>>>,
 }
 
 impl Context {
