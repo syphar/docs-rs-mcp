@@ -28,6 +28,7 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
     let server_url = Url::parse(&server.url()).unwrap();
     let config = Config {
         cache_dir: cache_dir.path().to_path_buf(),
+        log_dir: cache_dir.path().join("logs"),
         docs_rs_server: server_url.clone(),
         static_crates_io: server_url.clone(),
         resolver_cache_ttl: Duration::from_secs(0),

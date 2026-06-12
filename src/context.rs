@@ -39,6 +39,7 @@ impl Context {
 
 pub(crate) struct Config {
     pub(crate) cache_dir: PathBuf,
+    pub(crate) log_dir: PathBuf,
     pub(crate) docs_rs_server: Url,
     pub(crate) static_crates_io: Url,
     pub(crate) resolver_cache_ttl: Duration,
@@ -51,8 +52,12 @@ impl Config {
         let cache_dir = base_dirs.cache_dir().join(APP_NAME);
         fs::create_dir_all(&cache_dir)?;
 
+        let log_dir = cache_dir.join("logs");
+        fs::create_dir_all(&log_dir)?;
+
         Ok(Self {
             cache_dir,
+            log_dir,
             docs_rs_server: Url::parse("https://docs.rs")?,
             static_crates_io: Url::parse("https://static.crates.io")?,
             resolver_cache_ttl: Duration::from_secs(60 * 60),
