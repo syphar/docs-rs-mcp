@@ -2,6 +2,7 @@ use crate::{
     config::Config,
     tools::{
         get_item::{self, GetItemArgs},
+        list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
         resolve_version::{self, ResolveVersionArgs},
         search_items::{self, SearchItemsArgs},
@@ -148,6 +149,39 @@ The result includes:
         Parameters(args): Parameters<GetItemArgs>,
     ) -> Result<CallToolResult, McpError> {
         get_item::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+List inherent + trait-impl methods on a type. Walks every `impl` block in the crate whose \
+`for_` resolves to `type_path` and returns the function-shaped items inside.
+
+`type_path` is the fully-qualified path of the type, including the crate name (e.g. \
+`\"axum::routing::Router\"` or `\"axum::Router\"`); re-export paths are resolved to the \
+canonical type.
+
+Each result has:
+  - `name`: method name
+  - `kind`: typically `function`
+  - `signature`: structured `ItemEnum::Function` (generics, decl, header)
+  - `via_trait`: path of the trait (e.g. `\"core::clone::Clone\"`) when the method comes from \
+    a trait impl, omitted for inherent methods
+  - `summary`: first paragraph of the method's doc comment
+  - `deprecated`: true when the method has `#[deprecated]`
+
+Limitations:
+  - Blanket impls (`impl<T: Trait> Foo for T`) are skipped — `for_` isn't a concrete type.
+  - Default trait methods that the impl doesn't override aren't repeated here. Call \
+    `get_item` on the trait if you need them.
+  - Only function-shaped items are returned (no associated consts/types).
+
+Requires an exact `version` and uses the same `target` defaulting/fallback as other tools."
+    )]
+    async fn list_methods(
+        &self,
+        Parameters(args): Parameters<ListMethodsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        list_methods::handle(&self.config, args).await
     }
 }
 

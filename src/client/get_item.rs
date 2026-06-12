@@ -91,7 +91,7 @@ pub(crate) fn get_item(
     Some(record)
 }
 
-fn resolve_item<'a>(
+pub(crate) fn resolve_item<'a>(
     docs: &'a rustdoc_types::Crate,
     path: &[String],
 ) -> Option<(Id, &'a rustdoc_types::Item)> {
