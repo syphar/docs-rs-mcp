@@ -4,23 +4,28 @@ use crate::{
 };
 use anyhow::Result;
 use serde::Serialize;
-use std::path::Path;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Example {
-    /// Path of the example file within the crate's source tree
-    /// (e.g. `"examples/hello.rs"`).
-    pub(crate) path: String,
-    /// Inferred example name — typically the file stem, or the directory
-    /// name for multi-file examples.
+    /// Cargo's idea of the example's name (what you'd pass to
+    /// `cargo run --example <name>`).
     pub(crate) name: String,
+    /// Absolute path of the example file on disk (in the server's extracted
+    /// crate cache). The AI can read this directly with its own file tool.
+    pub(crate) path: String,
+    /// Features that must be enabled for this example to compile (from
+    /// `required-features` in `Cargo.toml`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) required_features: Vec<String>,
     /// File contents. Included only when the caller asked for them.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) content: Option<String>,
 }
 
-/// List `.rs` files under `examples/` in the crate's source tree. When
-/// `include_content` is true, also reads each file and includes its source.
+/// List examples for a crate. Uses `cargo-manifest` to read both explicit
+/// `[[example]]` entries from `Cargo.toml` and auto-discovered `examples/*.rs`
+/// files, respecting `autoexamples = false`. Returns `None` if the crate has
+/// no examples (no `[[example]]` and no `examples/` directory).
 pub(crate) async fn find_examples(
     config: &Config,
     krate: &str,
@@ -31,54 +36,35 @@ pub(crate) async fn find_examples(
         return Ok(None);
     };
 
-    let version = version.to_string();
-    let source_dir = extract_source(&archive_path, krate, &version).await?;
-    let examples_dir = source_dir.join("examples");
-    if !examples_dir.exists() {
+    let version_str = version.to_string();
+    let source_dir = extract_source(&archive_path, krate, &version_str).await?;
+    // `from_path` calls `complete_from_path` under the hood — fills in
+    // auto-discovered examples from `examples/*.rs`.
+    let manifest = cargo_manifest::Manifest::from_path(source_dir.join("Cargo.toml"))?;
+
+    if manifest.example.is_empty() {
         return Ok(None);
     }
 
     let mut examples = Vec::new();
-
-    for entry in walkdir::WalkDir::new(&examples_dir) {
-        let entry = entry?;
-        if entry.path().extension().is_none_or(|e| e != "rs") {
-            continue;
-        }
-
-        let name = derive_example_name(entry.path().strip_prefix(&examples_dir)?);
+    for product in manifest.example {
+        let Some(rel_path) = product.path else { continue };
+        let Some(name) = product.name else { continue };
+        let abs_path = source_dir.join(&rel_path);
         let content = if include_content {
-            let content = std::fs::read(entry.path())?;
-            Some(String::from_utf8_lossy(&content).into_owned())
+            Some(std::fs::read_to_string(&abs_path)?)
         } else {
             None
         };
         examples.push(Example {
-            path: std::path::absolute(entry.path())?.display().to_string(),
             name,
+            path: abs_path.to_string_lossy().into_owned(),
+            required_features: product.required_features,
             content,
         });
     }
-    examples.sort_by(|a, b| a.path.cmp(&b.path));
+    examples.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(Some(examples))
-}
-
-fn derive_example_name(path: impl AsRef<Path>) -> String {
-    let path = path.as_ref();
-    // examples/foo.rs       -> "foo"
-    // examples/foo/main.rs  -> "foo"
-    // examples/foo/bar.rs   -> "foo/bar"
-    let components: Vec<&str> = path
-        .components()
-        .filter_map(|c| c.as_os_str().to_str())
-        .collect();
-
-    match components.as_slice() {
-        [single] => single.trim_end_matches(".rs").to_string(),
-        [dir, "main.rs"] => dir.to_string(),
-        [dir, file] => format!("{dir}/{}", file.trim_end_matches(".rs")),
-        _ => path.to_string_lossy().into_owned(),
-    }
 }
 
 #[cfg(test)]
@@ -99,8 +85,7 @@ mod tests {
             .create();
 
         // The published `axum` crate doesn't ship its examples (those live in
-        // the workspace at axum/examples/). So we expect an empty list, but
-        // the lookup itself should succeed.
+        // the workspace at axum/examples/). So we expect None.
         assert!(
             find_examples(env.config(), "axum", &version, false)
                 .await?

@@ -442,7 +442,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
- "walkdir",
  "zstd",
 ]
 
