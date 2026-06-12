@@ -1,4 +1,5 @@
 pub(crate) mod get_docs;
+pub(crate) mod get_item;
 pub(crate) mod list_module;
 pub(crate) mod search_items;
 pub(crate) mod status;

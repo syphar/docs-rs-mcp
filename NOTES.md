@@ -5,6 +5,7 @@
 - prefetch rustdoc json when we get resolve-version requests, including external
   dependencies?
 - in-memory cache with moka? perhaps using a reduced data structure?
+- in-memory cache for version-resolve? with X minutes expiration?
 - on-disk sqlite representation for faster queries?
 
 ## mcp libs
