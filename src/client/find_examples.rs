@@ -1,5 +1,5 @@
 use crate::{
-    client::get_source::{extract_source, fetch_crate},
+    client::get_source::{extract_source, fetch_cargo_manifest, fetch_crate},
     config::Config,
 };
 use anyhow::Result;
@@ -36,11 +36,15 @@ pub(crate) async fn find_examples(
         return Ok(None);
     };
 
+    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
+        return Ok(None);
+    };
+
     let version_str = version.to_string();
     let source_dir = extract_source(&archive_path, krate, &version_str).await?;
     // `from_path` calls `complete_from_path` under the hood — fills in
     // auto-discovered examples from `examples/*.rs`.
-    let manifest = cargo_manifest::Manifest::from_path(source_dir.join("Cargo.toml"))?;
+    // let manifest = cargo_manifest::Manifest::from_path(source_dir.join("Cargo.toml"))?;
 
     if manifest.example.is_empty() {
         return Ok(None);
@@ -48,7 +52,9 @@ pub(crate) async fn find_examples(
 
     let mut examples = Vec::new();
     for product in manifest.example {
-        let Some(rel_path) = product.path else { continue };
+        let Some(rel_path) = product.path else {
+            continue;
+        };
         let Some(name) = product.name else { continue };
         let abs_path = source_dir.join(&rel_path);
         let content = if include_content {

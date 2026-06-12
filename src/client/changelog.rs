@@ -1,7 +1,4 @@
-use crate::{
-    client::get_source::{fetch_crate, fetch_from_source},
-    config::Config,
-};
+use crate::{client::get_source::fetch_source, config::Config};
 use anyhow::Result;
 use serde::Serialize;
 
@@ -34,13 +31,24 @@ pub(crate) async fn changelog(
     version: &semver::Version,
     section_version: Option<&str>,
 ) -> Result<Option<Changelog>> {
-    let Some(archive_path) = fetch_crate(config, krate, version).await? else {
+    let Some(source_dir) = fetch_source(config, krate, version).await? else {
         return Ok(None);
     };
 
-    let Some((candidate, bytes)) = fetch_from_source(&archive_path, CANDIDATES).await? else {
+    let mut changelog = None;
+    for candidate in CANDIDATES {
+        let candidate = source_dir.join(candidate);
+        if candidate.exists() {
+            changelog = Some(candidate);
+            break;
+        }
+    }
+
+    let Some(changelog) = changelog else {
         return Ok(None);
     };
+
+    let bytes = tokio::fs::read(&changelog).await?;
 
     let text = String::from_utf8_lossy(&bytes).into_owned();
     let content = match section_version {
@@ -49,7 +57,7 @@ pub(crate) async fn changelog(
     };
 
     Ok(Some(Changelog {
-        source_file: candidate.display().to_string(),
+        source_file: changelog.display().to_string(),
         content,
     }))
 }
