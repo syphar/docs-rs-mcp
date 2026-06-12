@@ -2,11 +2,10 @@
 
 ## TODO:
 
-- support multiple format versions? use multiple rustdoc-types crate versoins?
 - prefetch rustdoc json when we get resolve-version requests, including external
   dependencies?
-- support for targets. Or assume always the host target for now? for local
-  usage?
+- in-memory cache with moka? perhaps using a reduced data structure?
+- on-disk sqlite representation for faster queries?
 
 ## mcp libs
 
