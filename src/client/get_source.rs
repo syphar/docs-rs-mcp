@@ -121,21 +121,23 @@ pub(crate) async fn extract_source(
 }
 
 /// Convenience: fetch the crate archive (if needed), read `Cargo.toml`, and
-/// parse it. Returns `Ok(None)` when the crate/version isn't on crates.io.
-pub(crate) async fn fetch_cargo_toml(
+/// parse it into the typed `cargo_manifest::Manifest`. Pure parser — does
+/// not shell out to `cargo`. Returns `Ok(None)` when the crate/version isn't
+/// on crates.io.
+pub(crate) async fn fetch_cargo_manifest(
     config: &Config,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<toml::Value>> {
+) -> Result<Option<cargo_manifest::Manifest>> {
     let Some(archive_path) = fetch_crate(config, krate, version).await? else {
         return Ok(None);
     };
     let Some((_, bytes)) = fetch_from_source(&archive_path, ["Cargo.toml"]).await? else {
         return Ok(None);
     };
-    let text = std::str::from_utf8(&bytes).context("Cargo.toml is not valid UTF-8")?;
-    let value: toml::Value = toml::from_str(text).context("parsing Cargo.toml")?;
-    Ok(Some(value))
+    let manifest =
+        cargo_manifest::Manifest::from_slice(&bytes).context("parsing Cargo.toml")?;
+    Ok(Some(manifest))
 }
 
 #[cfg(test)]

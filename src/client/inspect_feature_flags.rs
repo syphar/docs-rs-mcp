@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_toml, config::Config};
+use crate::{client::get_source::fetch_cargo_manifest, config::Config};
 use anyhow::Result;
 use serde::Serialize;
 
@@ -19,42 +19,33 @@ pub(crate) async fn inspect_feature_flags(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Feature>>> {
-    let Some(cargo) = fetch_cargo_toml(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
         return Ok(None);
     };
-    let features_table = cargo.get("features").and_then(|v| v.as_table());
-    let Some(features_table) = features_table else {
+    let Some(mut features) = manifest.features else {
         return Ok(Some(Vec::new()));
     };
 
-    let defaults: Vec<String> = features_table
-        .get("default")
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|x| x.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
+    let defaults: Vec<String> = features.remove("default").unwrap_or_default();
 
-    let mut out: Vec<Feature> = features_table
-        .iter()
-        .map(|(name, value)| {
-            let enables: Vec<String> = value
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_str().map(str::to_string))
-                        .collect()
-                })
-                .unwrap_or_default();
-            Feature {
-                name: name.clone(),
-                default: defaults.iter().any(|d| d == name),
-                enables,
-            }
+    let mut out: Vec<Feature> = features
+        .into_iter()
+        .map(|(name, enables)| Feature {
+            default: defaults.iter().any(|d| d == &name),
+            name,
+            enables,
         })
         .collect();
+    // Re-insert the `default` feature row itself so the caller sees what it
+    // expands to (we removed it above only so it wasn't treated as a regular
+    // feature when checking which features are in defaults).
+    if !defaults.is_empty() {
+        out.push(Feature {
+            name: "default".to_string(),
+            enables: defaults,
+            default: false,
+        });
+    }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(Some(out))
 }
@@ -80,13 +71,12 @@ mod tests {
             .await?
             .expect("features present");
 
-        // axum has known features like "default", "json", "ws", "macros", ...
         let names: Vec<&str> = features.iter().map(|f| f.name.as_str()).collect();
         assert!(names.contains(&"default"));
         assert!(names.contains(&"json"));
         assert!(names.contains(&"ws"));
 
-        // At least some features are in default.
+        // At least some features are in default (e.g. json, tokio, http1).
         assert!(features.iter().any(|f| f.default));
 
         Ok(())

@@ -1,5 +1,6 @@
-use crate::{client::get_source::fetch_cargo_toml, config::Config};
+use crate::{client::get_source::fetch_cargo_manifest, config::Config};
 use anyhow::Result;
+use cargo_manifest::{Dependency as ManifestDep, DepsSet};
 use serde::Serialize;
 
 #[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
@@ -12,7 +13,13 @@ pub(crate) enum DependencyKind {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Dependency {
+    /// Manifest key for the dep — note this can differ from the actual crate
+    /// name when the dep uses `package = "..."` to rename it.
     pub(crate) name: String,
+    /// Set to the real crate name when the manifest renames it via
+    /// `package = "..."`; otherwise omitted.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) package: Option<String>,
     pub(crate) kind: DependencyKind,
     /// Version requirement string from Cargo.toml, e.g. `"^1.0"`, `"=0.4.2"`,
     /// `"*"`. `None` for path/git-only deps with no version.
@@ -37,53 +44,36 @@ pub(crate) async fn dependency_tree(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Dependency>>> {
-    let Some(cargo) = fetch_cargo_toml(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
         return Ok(None);
     };
 
     let mut out = Vec::new();
+    collect_section(manifest.dependencies.as_ref(), DependencyKind::Normal, None, &mut out);
+    collect_section(manifest.dev_dependencies.as_ref(), DependencyKind::Dev, None, &mut out);
     collect_section(
-        &cargo,
-        "dependencies",
-        DependencyKind::Normal,
-        None,
-        &mut out,
-    );
-    collect_section(
-        &cargo,
-        "dev-dependencies",
-        DependencyKind::Dev,
-        None,
-        &mut out,
-    );
-    collect_section(
-        &cargo,
-        "build-dependencies",
+        manifest.build_dependencies.as_ref(),
         DependencyKind::Build,
         None,
         &mut out,
     );
 
-    // Target-specific deps: [target.'cfg(...)'.dependencies] etc.
-    if let Some(targets) = cargo.get("target").and_then(|v| v.as_table()) {
+    if let Some(targets) = manifest.target.as_ref() {
         for (target_cfg, t) in targets {
             collect_section(
-                t,
-                "dependencies",
+                Some(&t.dependencies),
                 DependencyKind::Normal,
                 Some(target_cfg.clone()),
                 &mut out,
             );
             collect_section(
-                t,
-                "dev-dependencies",
+                Some(&t.dev_dependencies),
                 DependencyKind::Dev,
                 Some(target_cfg.clone()),
                 &mut out,
             );
             collect_section(
-                t,
-                "build-dependencies",
+                Some(&t.build_dependencies),
                 DependencyKind::Build,
                 Some(target_cfg.clone()),
                 &mut out,
@@ -100,61 +90,43 @@ pub(crate) async fn dependency_tree(
 }
 
 fn collect_section(
-    root: &toml::Value,
-    key: &str,
+    section: Option<&DepsSet>,
     kind: DependencyKind,
     target: Option<String>,
     out: &mut Vec<Dependency>,
 ) {
-    let Some(table) = root.get(key).and_then(|v| v.as_table()) else {
-        return;
-    };
-    for (name, spec) in table {
-        let dep = match spec {
-            toml::Value::String(req) => Dependency {
-                name: name.clone(),
-                kind,
-                req: Some(req.clone()),
-                optional: false,
-                default_features: true,
-                features: Vec::new(),
-                target: target.clone(),
-            },
-            toml::Value::Table(t) => {
-                let req = t
-                    .get("version")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_string);
-                let optional = t.get("optional").and_then(|v| v.as_bool()).unwrap_or(false);
-                let default_features = t
-                    .get("default-features")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
-                let features = t
-                    .get("features")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|x| x.as_str().map(str::to_string))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                // If the table uses `package = "..."`, the dep name in the
-                // graph is the package name, not the key; emit both via name
-                // (we keep the key as the display name).
-                Dependency {
-                    name: name.clone(),
-                    kind,
-                    req,
-                    optional,
-                    default_features,
-                    features,
-                    target: target.clone(),
-                }
-            }
-            _ => continue,
+    let Some(section) = section else { return };
+    for (name, dep) in section {
+        let (req, optional, default_features, features, package) = match dep {
+            ManifestDep::Simple(req) => (Some(req.clone()), false, true, Vec::new(), None),
+            ManifestDep::Detailed(d) => (
+                d.version.clone(),
+                d.optional.unwrap_or(false),
+                d.default_features.unwrap_or(true),
+                d.features.clone().unwrap_or_default(),
+                d.package.clone(),
+            ),
+            // Inherited from workspace — we only have the local crate's
+            // Cargo.toml, so we can't resolve the inherited fields. Surface
+            // the dep with what little we know.
+            ManifestDep::Inherited(i) => (
+                None,
+                i.optional.unwrap_or(false),
+                true,
+                i.features.clone().unwrap_or_default(),
+                None,
+            ),
         };
-        out.push(dep);
+        out.push(Dependency {
+            name: name.clone(),
+            package,
+            kind,
+            req,
+            optional,
+            default_features,
+            features,
+            target: target.clone(),
+        });
     }
 }
 
@@ -180,10 +152,8 @@ mod tests {
             .expect("deps present");
 
         let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
-        // axum should depend on tokio, hyper, tower, etc.
         assert!(names.iter().any(|n| n.contains("axum-core")));
         assert!(names.contains(&"tower"));
-        // Some are dev/build deps.
         assert!(deps.iter().any(|d| d.kind == DependencyKind::Dev));
 
         Ok(())

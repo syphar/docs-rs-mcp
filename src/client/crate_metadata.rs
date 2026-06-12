@@ -1,5 +1,6 @@
-use crate::{client::get_source::fetch_cargo_toml, config::Config};
+use crate::{client::get_source::fetch_cargo_manifest, config::Config};
 use anyhow::Result;
+use cargo_manifest::MaybeInherited;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -33,44 +34,45 @@ pub(crate) struct CrateMetadata {
     pub(crate) categories: Vec<String>,
 }
 
+/// Extract the local (non-inherited) value of a `MaybeInherited<T>`. Inherited
+/// values reference a workspace's Cargo.toml which we don't fetch; treat them
+/// as absent for the purposes of this tool.
+fn local<T>(mi: Option<MaybeInherited<T>>) -> Option<T> {
+    mi.and_then(MaybeInherited::as_local)
+}
+
 pub(crate) async fn crate_metadata(
     config: &Config,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<CrateMetadata>> {
-    let Some(cargo) = fetch_cargo_toml(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
         return Ok(None);
     };
-    let pkg = cargo.get("package").and_then(|p| p.as_table());
-    let Some(pkg) = pkg else { return Ok(None) };
-
-    let str_opt = |key: &str| pkg.get(key).and_then(|v| v.as_str()).map(str::to_string);
-    let str_vec = |key: &str| {
-        pkg.get(key)
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|x| x.as_str().map(str::to_string))
-                    .collect()
-            })
-            .unwrap_or_default()
+    let Some(pkg) = manifest.package else {
+        return Ok(None);
     };
 
+    let readme = local(pkg.readme).and_then(|s_or_b| match s_or_b {
+        cargo_manifest::StringOrBool::String(s) => Some(s),
+        cargo_manifest::StringOrBool::Bool(_) => None,
+    });
+
     Ok(Some(CrateMetadata {
-        name: str_opt("name").unwrap_or_else(|| krate.to_string()),
-        version: str_opt("version").unwrap_or_else(|| version.to_string()),
-        description: str_opt("description"),
-        repository: str_opt("repository"),
-        homepage: str_opt("homepage"),
-        documentation: str_opt("documentation"),
-        license: str_opt("license"),
-        license_file: str_opt("license-file"),
-        readme: str_opt("readme"),
-        rust_version: str_opt("rust-version"),
-        edition: str_opt("edition"),
-        authors: str_vec("authors"),
-        keywords: str_vec("keywords"),
-        categories: str_vec("categories"),
+        name: pkg.name,
+        version: local(pkg.version).unwrap_or_else(|| version.to_string()),
+        description: local(pkg.description),
+        repository: local(pkg.repository),
+        homepage: local(pkg.homepage),
+        documentation: local(pkg.documentation),
+        license: local(pkg.license),
+        license_file: local(pkg.license_file),
+        readme,
+        rust_version: local(pkg.rust_version),
+        edition: local(pkg.edition).map(|e| e.as_str().to_string()),
+        authors: local(pkg.authors).unwrap_or_default(),
+        keywords: local(pkg.keywords).unwrap_or_default(),
+        categories: local(pkg.categories).unwrap_or_default(),
     }))
 }
 
