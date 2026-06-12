@@ -364,6 +364,7 @@ mod tests {
                 "axum::extract::ws::rejection",
                 "axum::handler",
                 "axum::handler::future",
+                "axum::http",
                 "axum::middleware",
                 "axum::middleware::future",
                 "axum::response",
