@@ -4,7 +4,10 @@ use crate::{
 };
 use anyhow::{Result, bail};
 use reqwest::Url;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 pub(crate) struct TestEnv {
     context: Context,
@@ -27,6 +30,7 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
         cache_dir: cache_dir.path().to_path_buf(),
         docs_rs_server: server_url.clone(),
         static_crates_io: server_url.clone(),
+        resolver_cache_ttl: Duration::from_secs(0),
     };
 
     Ok(TestEnv {

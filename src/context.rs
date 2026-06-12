@@ -1,17 +1,25 @@
 use anyhow::{Result, anyhow};
 use directories::BaseDirs;
+use moka::future::Cache;
 use reqwest::Url;
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, time::Duration};
 
-use crate::APP_NAME;
+use crate::{APP_NAME, client::status::Status};
 
 pub(crate) struct Context {
     config: Config,
+    pub(crate) resolver_cache: Cache<semver::VersionReq, Option<Status>>,
 }
 
 impl Context {
     pub(crate) fn new(config: Config) -> Self {
-        Self { config }
+        Self {
+            resolver_cache: Cache::builder()
+                // cache for 1h
+                .time_to_live(config.resolver_cache_ttl)
+                .build(),
+            config,
+        }
     }
     pub(crate) fn config(&self) -> &Config {
         &self.config
@@ -22,6 +30,7 @@ pub(crate) struct Config {
     pub(crate) cache_dir: PathBuf,
     pub(crate) docs_rs_server: Url,
     pub(crate) static_crates_io: Url,
+    pub(crate) resolver_cache_ttl: Duration,
 }
 
 impl Config {
@@ -35,6 +44,7 @@ impl Config {
             cache_dir,
             docs_rs_server: Url::parse("https://docs.rs")?,
             static_crates_io: Url::parse("https://static.crates.io")?,
+            resolver_cache_ttl: Duration::from_secs(60 * 60),
         })
     }
 }

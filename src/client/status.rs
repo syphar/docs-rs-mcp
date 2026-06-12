@@ -3,7 +3,7 @@ use anyhow::Result;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub(crate) struct Status {
     pub(crate) doc_status: bool,
     pub(crate) version: semver::Version,

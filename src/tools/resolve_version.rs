@@ -17,9 +17,17 @@ pub(crate) async fn handle(
     context: &Context,
     args: ResolveVersionArgs,
 ) -> Result<CallToolResult, McpError> {
-    let status = get_docs_status(context, &args.krate, args.req.as_ref())
-        .await
+    let status = context
+        .resolver_cache
+        .entry(args.req.clone().into())
+        .or_try_insert_with::<_, anyhow::Error>(async move {
+            get_docs_status(context, &args.krate, args.req.as_ref()).await
+        })
+        .await;
+
+    let status = status
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
+        .into_value()
         .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;
 
     Ok(CallToolResult::structured(
