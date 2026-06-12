@@ -1,6 +1,7 @@
 use crate::config::Config;
-use anyhow::Result;
+use anyhow::{Result, bail};
 use reqwest::Url;
+use std::path::{Path, PathBuf};
 
 pub(crate) struct TestEnv {
     config: Config,
@@ -28,4 +29,16 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
         server,
         _cache_dir: cache_dir,
     })
+}
+
+pub(crate) fn fixture(path: impl AsRef<Path>) -> Result<PathBuf> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/")
+        .join(path.as_ref());
+
+    if !path.exists() {
+        bail!("fixture {} doesn't exist", path.display());
+    } else {
+        Ok(path)
+    }
 }
