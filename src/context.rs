@@ -2,13 +2,14 @@ use anyhow::{Result, anyhow};
 use directories::BaseDirs;
 use moka::future::Cache;
 use reqwest::Url;
-use std::{fs, path::PathBuf, time::Duration};
+use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
 use crate::{APP_NAME, client::status::Status};
 
 pub(crate) struct Context {
     config: Config,
-    pub(crate) resolver_cache: Cache<semver::VersionReq, Option<Status>>,
+    pub(crate) resolver_cache: Cache<semver::VersionReq, Arc<Option<Status>>>,
+    pub(crate) rustdoc_json_cache: Cache<(String, semver::Version), Arc<rustdoc_types::Crate>>,
 }
 
 impl Context {
@@ -18,6 +19,7 @@ impl Context {
                 // cache for 1h
                 .time_to_live(config.resolver_cache_ttl)
                 .build(),
+            rustdoc_json_cache: Cache::builder().build(),
             config,
         }
     }

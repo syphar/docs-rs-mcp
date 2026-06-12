@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{client::status::get_docs_status, context::Context, types::semver::VersionReq};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
@@ -21,17 +23,25 @@ pub(crate) async fn handle(
         .resolver_cache
         .entry(args.req.clone().into())
         .or_try_insert_with::<_, anyhow::Error>(async move {
-            get_docs_status(context, &args.krate, args.req.as_ref()).await
+            Ok(Arc::new(
+                get_docs_status(context, &args.krate, args.req.as_ref()).await?,
+            ))
         })
         .await;
 
-    let status = status
+    if let Some(status) = status
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
         .into_value()
-        .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;
-
-    Ok(CallToolResult::structured(
-        serde_json::to_value(&status)
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+        .as_ref()
+    {
+        Ok(CallToolResult::structured(
+            serde_json::to_value(status)
+                .map_err(|err| McpError::internal_error(err.to_string(), None))?,
+        ))
+    } else {
+        Err(McpError::resource_not_found(
+            "crate or version not found",
+            None,
+        ))
+    }
 }
