@@ -1,5 +1,5 @@
 use crate::{client::CLIENT, config::Config};
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use async_compression::tokio::bufread::ZstdDecoder;
 use futures_util::TryStreamExt;
 use reqwest::Url;
@@ -52,7 +52,8 @@ async fn fetch_rustdoc_json(
     fs::create_dir_all(&target_dir).await?;
     let url = config
         .docs_rs_server
-        .join(&build_download_url(krate, &version))?;
+        .join(&build_download_url(krate, &version))
+        .context("can't build download url")?;
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 

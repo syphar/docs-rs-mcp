@@ -187,15 +187,7 @@ fn expand_use(
             return;
         }
         // External glob: try to expand using a fetched external crate.
-        expand_external_glob(
-            docs,
-            externals,
-            target_id,
-            prefix,
-            out,
-            query,
-            kind_filter,
-        );
+        expand_external_glob(docs, externals, target_id, prefix, out, query, kind_filter);
         return;
     };
 
@@ -414,29 +406,31 @@ pub(crate) struct NeededCrate {
 /// Crates whose rustdoc JSON would be needed to fully expand the glob
 /// re-exports of `docs` that target external crates.
 pub(crate) fn needed_crates(docs: &rustdoc_types::Crate) -> Vec<NeededCrate> {
-    let ids: HashSet<u32> = docs
-        .index
-        .values()
-        .filter_map(|item| match &item.inner {
-            ItemEnum::Use(u) if u.is_glob => u.id,
-            _ => None,
-        })
-        .filter(|target_id| !docs.index.contains_key(target_id))
-        .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
-        .collect();
+    let ids: HashSet<u32> = dbg!(
+        docs.index
+            .values()
+            .filter_map(|item| match &item.inner {
+                ItemEnum::Use(u) if u.is_glob => u.id,
+                _ => None,
+            })
+            .filter(|target_id| !docs.index.contains_key(target_id))
+            .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
+            .collect()
+    );
 
-    let mut result: Vec<NeededCrate> = ids
-        .into_iter()
-        .filter_map(|id| docs.external_crates.get(&id))
-        .map(|ec| NeededCrate {
-            name: ec.name.clone(),
-            version: ec
-                .html_root_url
-                .as_deref()
-                .and_then(parse_version_from_docs_rs_url),
-            html_root_url: ec.html_root_url.clone(),
-        })
-        .collect();
+    let mut result: Vec<NeededCrate> = dbg!(
+        ids.into_iter()
+            .filter_map(|id| docs.external_crates.get(&id))
+            .map(|ec| NeededCrate {
+                name: ec.name.clone(),
+                version: ec
+                    .html_root_url
+                    .as_deref()
+                    .and_then(parse_version_from_docs_rs_url),
+                html_root_url: ec.html_root_url.clone(),
+            })
+            .collect()
+    );
     result.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.version.cmp(&b.version)));
     result
 }
@@ -494,8 +488,10 @@ fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::docs_fixture;
-    use anyhow::Result;
+    use crate::{
+        config::Config, test_utils::docs_fixture, tools::search_items::fetch_needed_externals,
+    };
+    use anyhow::{Context as _, Result};
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
@@ -574,22 +570,11 @@ mod tests {
     #[tokio::test]
     async fn test_list_traits() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+        let config = Config::from_env()?;
 
-        let needed: HashSet<_> = docs
-            .index
-            .values()
-            .filter_map(|item| match &item.inner {
-                ItemEnum::Use(u) if u.is_glob => u.id,
-                _ => None,
-            })
-            .filter(|target_id| !docs.index.contains_key(target_id))
-            // .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
-            .filter_map(|target_id| docs.paths.get(&target_id))
-            .collect();
+        let externals = fetch_needed_externals(&config, &docs).await?;
 
-        dbg!(&needed);
-
-        let results = search(&docs, &HashMap::new(), None, Some(ItemKind::Trait), None);
+        let results = search(&docs, &externals, None, Some(ItemKind::Trait), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
 

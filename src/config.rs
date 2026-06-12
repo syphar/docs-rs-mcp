@@ -19,7 +19,7 @@ impl Config {
 
         Ok(Self {
             cache_dir,
-            docs_rs_server: Url::parse("https:://docs.rs")?,
+            docs_rs_server: Url::parse("https://docs.rs")?,
         })
     }
 }
