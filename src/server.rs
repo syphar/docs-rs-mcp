@@ -48,6 +48,11 @@ something else — check their `Cargo.toml [build] target`, a `.cargo/config.tom
 they've said about deployment. Using the wrong target hides items gated on `#[cfg(target_os = \
 ...)]` and can surface items that won't compile on the real target.
 
+If docs.rs has no build for the requested `target` (most crates opt into only the default \
+target), the server falls back to `x86_64-unknown-linux-gnu` silently and returns those \
+results, assuming the crate's API is the same across targets. Cfg-gated items may then be \
+missing or extra — verify against the user's actual target if precision matters.
+
 Each result has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), \
 `kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via \
 `#[doc(alias = \"...\")]`; the query also matches against these), and optionally `reexport`.

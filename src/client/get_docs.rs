@@ -1,7 +1,7 @@
 use crate::{client::CLIENT, config::Config};
 use anyhow::{Context as _, Result};
 use futures_util::TryStreamExt;
-use reqwest::Url;
+use reqwest::{StatusCode, Url};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -38,7 +38,7 @@ async fn fetch_rustdoc_json(
     krate: &str,
     version: &semver::Version,
     target: &str,
-) -> Result<PathBuf> {
+) -> Result<Option<PathBuf>> {
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
@@ -49,7 +49,7 @@ async fn fetch_rustdoc_json(
 
     if fs::try_exists(&target_path).await? {
         debug!(target_path = %target_path.display(), "found rustdoc json");
-        return Ok(target_path);
+        return Ok(Some(target_path));
     }
 
     fs::create_dir_all(&target_dir).await?;
@@ -60,18 +60,25 @@ async fn fetch_rustdoc_json(
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 
-    download(url, &target_path).await?;
+    if !download(url, &target_path).await? {
+        return Ok(None);
+    }
 
-    Ok(target_path)
+    Ok(Some(target_path))
 }
 
+/// Returns `Ok(None)` when docs.rs has no build for this `(krate, version,
+/// target)` triple (404). Callers may want to retry with a more common
+/// target such as `x86_64-unknown-linux-gnu`.
 pub(crate) async fn get_docs(
     config: &Config,
     krate: &str,
     version: &semver::Version,
     target: &str,
-) -> Result<rustdoc_types::Crate> {
-    let path = fetch_rustdoc_json(config, krate, version, target).await?;
+) -> Result<Option<rustdoc_types::Crate>> {
+    let Some(path) = fetch_rustdoc_json(config, krate, version, target).await? else {
+        return Ok(None);
+    };
 
     let krate = spawn_blocking(move || -> Result<_, anyhow::Error> {
         let file = std::fs::File::open(&path)?;
@@ -82,11 +89,16 @@ pub(crate) async fn get_docs(
     })
     .await??;
 
-    Ok(krate)
+    Ok(Some(krate))
 }
 
-async fn download(url: Url, target_path: &Path) -> Result<()> {
-    let response = CLIENT.get(url).send().await?.error_for_status()?;
+/// `Ok(true)` on success, `Ok(false)` on 404. Other HTTP errors propagate.
+async fn download(url: Url, target_path: &Path) -> Result<bool> {
+    let response = CLIENT.get(url).send().await?;
+    if response.status() == StatusCode::NOT_FOUND {
+        return Ok(false);
+    }
+    let response = response.error_for_status()?;
 
     let stream = response.bytes_stream().map_err(io::Error::other);
 
@@ -96,13 +108,15 @@ async fn download(url: Url, target_path: &Path) -> Result<()> {
     tokio::io::copy(&mut reader, &mut file).await?;
     file.flush().await?;
 
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::{fixture, test_env};
+
+    const TEST_TARGET: &str = "x86_64-unknown-linux-gnu";
 
     #[tokio::test]
     async fn test_success() -> Result<()> {
@@ -115,13 +129,15 @@ mod tests {
             .server
             .mock(
                 "GET",
-                build_download_url("axum", &version.to_string()).as_str(),
+                build_download_url("axum", &version.to_string(), TEST_TARGET).as_str(),
             )
             .with_status(200)
             .with_body_from_file(&fixure_path)
             .create();
 
-        let docs = get_docs(env.config(), "axum", &version).await?;
+        let docs = get_docs(env.config(), "axum", &version, TEST_TARGET)
+            .await?
+            .expect("expected docs to be present");
         assert_eq!(docs.crate_version, Some(version.to_string()));
 
         let root = &docs.paths[&docs.root];

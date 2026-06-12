@@ -23,7 +23,6 @@ rustdoc-types = "0.57.3"
 semver = { version = "1.0.28", features = ["serde"] }
 serde = "1.0.228"
 serde_json = "1.0.150"
-target-triple = "1.0.0"
 tokio = { version = "1.52.3", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tracing = "0.1.44"

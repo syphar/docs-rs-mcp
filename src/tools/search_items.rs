@@ -65,10 +65,22 @@ pub(crate) async fn handle(
     config: &Config,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
-    let target = args.target.as_deref().unwrap_or(DEFAULT_TARGET);
-    let docs = get_docs(config, &args.krate, args.version.as_ref(), target)
+    let requested_target = args.target.as_deref().unwrap_or(DEFAULT_TARGET);
+
+    // Try the requested target first; if docs.rs doesn't have a build for it
+    // (404), fall back to DEFAULT_TARGET on the assumption that the crate's
+    // API is the same. Most crates only have the default target built.
+    let mut docs = get_docs(config, &args.krate, args.version.as_ref(), requested_target)
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
+    if docs.is_none() && requested_target != DEFAULT_TARGET {
+        docs = get_docs(config, &args.krate, args.version.as_ref(), DEFAULT_TARGET)
+            .await
+            .map_err(|err| McpError::internal_error(err.to_string(), None))?;
+    }
+    let docs = docs.ok_or_else(|| {
+        McpError::resource_not_found("crate or version not found on docs.rs", None)
+    })?;
 
     let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
     let unexpanded_external_globs = search_items::unexpanded_external_globs(&docs);
