@@ -3,7 +3,12 @@ use crate::{
     config::Config,
 };
 use anyhow::{Context as _, Result};
-use std::path::PathBuf;
+use flate2::write::GzDecoder;
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+};
+use tar::Archive;
 use tokio::fs;
 use tracing::debug;
 
@@ -42,6 +47,26 @@ async fn fetch_crate(
     Ok(Some(target_path))
 }
 
+async fn fetch_from_source(path: impl AsRef<Path>, find_path: &str) -> Result<Vec<u8>> {
+    let path = path.as_ref();
+
+    dbg!(&path);
+    let tar_gz = File::open(path)?;
+    let tar = GzDecoder::new(tar_gz);
+    let mut archive = Archive::new(tar);
+
+    for entry in archive.entries()? {
+        let entry = entry?;
+
+        //     dbg!(&entry.path());
+    }
+
+    panic!();
+    // archive.unpack(".")?;
+
+    Ok(vec![])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,6 +95,10 @@ mod tests {
             .expect("expected docs to be present");
 
         assert!(path.exists());
+
+        let cargo_toml = fetch_from_source(&path, "Cargo.toml").await?;
+
+        // let file =
 
         // assert_eq!(docs.crate_version, Some(version.to_string()));
 
