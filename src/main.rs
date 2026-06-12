@@ -6,11 +6,11 @@ use tracing_subscriber::{self, EnvFilter};
 
 mod client;
 mod config;
-mod semver_types;
 mod server;
 #[cfg(test)]
 mod test_utils;
 mod tools;
+mod types;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 

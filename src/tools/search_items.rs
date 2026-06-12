@@ -1,4 +1,4 @@
-use crate::{client::docs::get_docs, config::Config, semver_types::Version};
+use crate::{client::docs::get_docs, config::Config, types::semver_types::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use rustdoc_types::{Id, ItemKind};
 use serde::Serialize;
