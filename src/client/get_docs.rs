@@ -1,6 +1,5 @@
 use crate::{client::CLIENT, config::Config};
 use anyhow::{Context as _, Result};
-use async_compression::tokio::bufread::ZstdDecoder;
 use futures_util::TryStreamExt;
 use reqwest::Url;
 use std::{
@@ -42,7 +41,7 @@ async fn fetch_rustdoc_json(
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
-    let target_path = target_dir.join(&version).with_extension("json");
+    let target_path = target_dir.join(&version).with_extension("json.zst");
 
     if fs::try_exists(&target_path).await? {
         debug!(target_path = %target_path.display(), "found rustdoc json");
@@ -57,7 +56,7 @@ async fn fetch_rustdoc_json(
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 
-    download_zstd_to_file(url, &target_path).await?;
+    download(url, &target_path).await?;
 
     Ok(target_path)
 }
@@ -69,27 +68,27 @@ pub(crate) async fn get_docs(
 ) -> Result<rustdoc_types::Crate> {
     let path = fetch_rustdoc_json(config, krate, version).await?;
 
-    let krate = spawn_blocking(move || {
+    let krate = spawn_blocking(move || -> Result<_, anyhow::Error> {
         let file = std::fs::File::open(&path)?;
         let reader = std::io::BufReader::new(file);
+        let decoder = zstd::stream::read::Decoder::new(reader)?;
 
-        Ok::<_, anyhow::Error>(serde_json::from_reader(reader)?)
+        Ok(serde_json::from_reader(decoder)?)
     })
     .await??;
 
     Ok(krate)
 }
 
-async fn download_zstd_to_file(url: Url, target_path: &Path) -> Result<()> {
+async fn download(url: Url, target_path: &Path) -> Result<()> {
     let response = CLIENT.get(url).send().await?.error_for_status()?;
 
     let stream = response.bytes_stream().map_err(io::Error::other);
 
-    let reader = StreamReader::new(stream);
-    let mut decoder = ZstdDecoder::new(reader);
+    let mut reader = StreamReader::new(stream);
     let mut file = File::create(target_path).await?;
 
-    tokio::io::copy(&mut decoder, &mut file).await?;
+    tokio::io::copy(&mut reader, &mut file).await?;
     file.flush().await?;
 
     Ok(())
