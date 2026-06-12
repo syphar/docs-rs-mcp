@@ -14,10 +14,10 @@ pub(crate) struct ResolveVersionArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: ResolveVersionArgs,
 ) -> Result<CallToolResult, McpError> {
-    let status = get_docs_status(config, &args.krate, args.req.as_ref())
+    let status = get_docs_status(context, &args.krate, args.req.as_ref())
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
         .ok_or_else(|| McpError::resource_not_found("crate or version not found", None))?;

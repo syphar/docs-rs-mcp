@@ -17,15 +17,16 @@ struct DependencyTreeResult {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: DependencyTreeArgs,
 ) -> Result<CallToolResult, McpError> {
-    let dependencies = dependency_tree::dependency_tree(config, &args.krate, args.version.as_ref())
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on crates.io", None)
-        })?;
+    let dependencies =
+        dependency_tree::dependency_tree(context, &args.krate, args.version.as_ref())
+            .await
+            .map_err(|err| McpError::internal_error(err.to_string(), None))?
+            .ok_or_else(|| {
+                McpError::resource_not_found("crate or version not found on crates.io", None)
+            })?;
 
     Ok(CallToolResult::structured(
         serde_json::to_value(DependencyTreeResult { dependencies })

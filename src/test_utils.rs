@@ -1,17 +1,20 @@
-use crate::{client::get_docs::parse_rustdoc_json, context::Context};
+use crate::{
+    client::get_docs::parse_rustdoc_json,
+    context::{Config, Context},
+};
 use anyhow::{Result, bail};
 use reqwest::Url;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct TestEnv {
-    config: Context,
+    context: Context,
     pub(crate) server: mockito::ServerGuard,
     _cache_dir: tempfile::TempDir,
 }
 
 impl TestEnv {
-    pub(crate) fn config(&self) -> &Context {
-        &self.config
+    pub(crate) fn context(&self) -> &Context {
+        &self.context
     }
 }
 
@@ -20,14 +23,14 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
 
     let cache_dir = tempfile::TempDir::new()?;
     let server_url = Url::parse(&server.url()).unwrap();
-    let config = Context {
+    let config = Config {
         cache_dir: cache_dir.path().to_path_buf(),
         docs_rs_server: server_url.clone(),
         static_crates_io: server_url.clone(),
     };
 
     Ok(TestEnv {
-        config,
+        context: Context::new(config),
         server,
         _cache_dir: cache_dir,
     })

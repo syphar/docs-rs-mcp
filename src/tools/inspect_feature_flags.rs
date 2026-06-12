@@ -17,11 +17,11 @@ struct InspectFeatureFlagsResult {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: InspectFeatureFlagsArgs,
 ) -> Result<CallToolResult, McpError> {
     let features =
-        inspect_feature_flags::inspect_feature_flags(config, &args.krate, args.version.as_ref())
+        inspect_feature_flags::inspect_feature_flags(context, &args.krate, args.version.as_ref())
             .await
             .map_err(|err| McpError::internal_error(err.to_string(), None))?
             .ok_or_else(|| {

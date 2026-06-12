@@ -16,11 +16,11 @@ pub(crate) struct ChangelogArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: ChangelogArgs,
 ) -> Result<CallToolResult, McpError> {
     let cl = changelog::changelog(
-        config,
+        context,
         &args.krate,
         args.version.as_ref(),
         args.section_version.as_deref(),

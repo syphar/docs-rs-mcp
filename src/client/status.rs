@@ -10,7 +10,7 @@ pub(crate) struct Status {
 }
 
 pub(crate) async fn get_docs_status(
-    config: &Context,
+    context: &Context,
     krate: &str,
     req_version: impl Into<&semver::VersionReq>,
 ) -> Result<Option<Status>> {
@@ -18,7 +18,8 @@ pub(crate) async fn get_docs_status(
 
     let response = CLIENT
         .get(
-            config
+            context
+                .config()
                 .docs_rs_server
                 .join(&format!("/crate/{krate}/{req_version}/status.json"))?,
         )
@@ -57,7 +58,7 @@ mod tests {
 
         assert_eq!(
             get_docs_status(
-                env.config(),
+                env.context(),
                 "itertools",
                 &semver::VersionReq::parse("1.2.3").unwrap(),
             )
@@ -80,7 +81,7 @@ mod tests {
 
         assert!(
             get_docs_status(
-                env.config(),
+                env.context(),
                 "itertools",
                 &semver::VersionReq::parse("1.2.3").unwrap(),
             )

@@ -42,11 +42,11 @@ fn local<T>(mi: Option<MaybeInherited<T>>) -> Option<T> {
 }
 
 pub(crate) async fn crate_metadata(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<CrateMetadata>> {
-    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
         return Ok(None);
     };
     let Some(pkg) = manifest.package else {
@@ -93,7 +93,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let meta = crate_metadata(env.config(), "axum", &version)
+        let meta = crate_metadata(env.context(), "axum", &version)
             .await?
             .expect("metadata present");
         assert_eq!(meta.name, "axum");

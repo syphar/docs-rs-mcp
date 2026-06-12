@@ -27,12 +27,12 @@ pub(crate) struct Example {
 /// files, respecting `autoexamples = false`. Returns `None` if the crate has
 /// no examples (no `[[example]]` and no `examples/` directory).
 pub(crate) async fn find_examples(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
     include_content: bool,
 ) -> Result<Option<Vec<Example>>> {
-    let Some(source_dir) = fetch_source(config, krate, version).await? else {
+    let Some(source_dir) = fetch_source(context, krate, version).await? else {
         return Ok(None);
     };
 
@@ -90,7 +90,7 @@ mod tests {
         // The published `axum` crate doesn't ship its examples (those live in
         // the workspace at axum/examples/). So we expect None.
         assert!(
-            find_examples(env.config(), "axum", &version, false)
+            find_examples(env.context(), "axum", &version, false)
                 .await?
                 .is_none()
         );
@@ -109,7 +109,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let examples = find_examples(env.config(), "itertools", &version, false)
+        let examples = find_examples(env.context(), "itertools", &version, false)
             .await?
             .expect("should have examples");
 
@@ -124,7 +124,7 @@ mod tests {
         assert!(iris.content.is_none(), "content omitted by default");
 
         // With include_content=true, content is populated.
-        let with_content = find_examples(env.config(), "itertools", &version, true)
+        let with_content = find_examples(env.context(), "itertools", &version, true)
             .await?
             .expect("should have examples");
         assert!(with_content[0].content.is_some());

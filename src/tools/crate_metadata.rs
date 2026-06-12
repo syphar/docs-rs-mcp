@@ -11,10 +11,10 @@ pub(crate) struct CrateMetadataArgs {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: CrateMetadataArgs,
 ) -> Result<CallToolResult, McpError> {
-    let meta = crate_metadata::crate_metadata(config, &args.krate, args.version.as_ref())
+    let meta = crate_metadata::crate_metadata(context, &args.krate, args.version.as_ref())
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
         .ok_or_else(|| {

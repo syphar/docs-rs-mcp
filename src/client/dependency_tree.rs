@@ -40,11 +40,11 @@ pub(crate) struct Dependency {
 /// transitive crate). For each direct dep returns kind + version req + the
 /// flags that affect its build.
 pub(crate) async fn dependency_tree(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Dependency>>> {
-    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
         return Ok(None);
     };
 
@@ -157,7 +157,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let deps = dependency_tree(env.config(), "axum", &version)
+        let deps = dependency_tree(env.context(), "axum", &version)
             .await?
             .expect("deps present");
 

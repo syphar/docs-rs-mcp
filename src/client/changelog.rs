@@ -26,12 +26,12 @@ const CANDIDATES: &[&str] = &[
 /// order; the first one that exists wins. When `version` is `Some`, returns
 /// only the section for that version (best-effort heuristic — see code).
 pub(crate) async fn changelog(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
     section_version: Option<&str>,
 ) -> Result<Option<Changelog>> {
-    let Some(source_dir) = fetch_source(config, krate, version).await? else {
+    let Some(source_dir) = fetch_source(context, krate, version).await? else {
         return Ok(None);
     };
 
@@ -118,7 +118,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let cl = changelog(env.config(), "axum", &version, None)
+        let cl = changelog(env.context(), "axum", &version, None)
             .await?
             .expect("changelog present");
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));

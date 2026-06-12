@@ -20,14 +20,14 @@ pub(crate) fn build_download_url(krate: &str, version: &str, target: Option<&str
 }
 
 async fn fetch_rustdoc_json(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
 ) -> Result<Option<PathBuf>> {
     let version = version.to_string();
 
-    let target_dir = dir_for_crate(&config.cache_dir, krate, &version);
+    let target_dir = dir_for_crate(&context.config().cache_dir, krate, &version);
     let target_path = target_dir
         .join(target.unwrap_or("default_target"))
         .with_extension("json.zst");
@@ -38,7 +38,8 @@ async fn fetch_rustdoc_json(
     }
 
     fs::create_dir_all(&target_dir).await?;
-    let url = config
+    let url = context
+        .config()
         .docs_rs_server
         .join(&build_download_url(krate, &version, target))
         .context("can't build download url")?;
@@ -118,7 +119,7 @@ mod tests {
             .with_body_from_file(&fixure_path)
             .create();
 
-        let docs = get_docs(env.config(), "axum", &version, target)
+        let docs = get_docs(env.context(), "axum", &version, target)
             .await?
             .expect("expected docs to be present");
         assert_eq!(docs.crate_version, Some(version.to_string()));

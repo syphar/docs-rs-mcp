@@ -18,10 +18,11 @@ pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
 }
 
 pub(crate) async fn fetch_crate(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<PathBuf>> {
+    let config = context.config();
     // TODO: optimization: use crate file in cargo cache, if it exists.
     let version = version.to_string();
 
@@ -139,7 +140,7 @@ mod tests {
             .with_body_from_file(&fixure_path)
             .create();
 
-        let path = fetch_source(env.config(), "axum", &version)
+        let path = fetch_source(env.context(), "axum", &version)
             .await?
             .expect("expected crate source to be present");
 

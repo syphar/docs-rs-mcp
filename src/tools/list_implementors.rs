@@ -33,11 +33,11 @@ struct ListImplementorsResult {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: ListImplementorsArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
-    let docs = get_docs(config, &args.krate, args.version.as_ref(), Some(target))
+    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target))
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?
         .ok_or_else(|| {

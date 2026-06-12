@@ -15,11 +15,11 @@ pub(crate) struct Feature {
 }
 
 pub(crate) async fn inspect_feature_flags(
-    config: &Context,
+    context: &Context,
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Vec<Feature>>> {
-    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
+    let Some(manifest) = fetch_cargo_manifest(context, krate, version).await? else {
         return Ok(None);
     };
     let Some(mut features) = manifest.features else {
@@ -67,7 +67,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let features = inspect_feature_flags(env.config(), "axum", &version)
+        let features = inspect_feature_flags(env.context(), "axum", &version)
             .await?
             .expect("features present");
 

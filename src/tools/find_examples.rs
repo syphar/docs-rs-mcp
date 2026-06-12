@@ -21,11 +21,11 @@ struct FindExamplesResult {
 }
 
 pub(crate) async fn handle(
-    config: &Context,
+    context: &Context,
     args: FindExamplesArgs,
 ) -> Result<CallToolResult, McpError> {
     let examples = find_examples::find_examples(
-        config,
+        context,
         &args.krate,
         args.version.as_ref(),
         args.include_content,
