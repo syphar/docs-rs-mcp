@@ -34,11 +34,13 @@ pub(crate) struct CrateMetadata {
     pub(crate) categories: Vec<String>,
 }
 
-/// Extract the local (non-inherited) value of a `MaybeInherited<T>`. Inherited
-/// values reference a workspace's Cargo.toml which we don't fetch; treat them
-/// as absent for the purposes of this tool.
-fn local<T>(mi: Option<MaybeInherited<T>>) -> Option<T> {
-    mi.and_then(MaybeInherited::as_local)
+/// Extract the local (non-inherited) value of a `MaybeInherited<T>`, cloning
+/// it out of the borrowed manifest. Inherited values reference a workspace's
+/// Cargo.toml which we don't fetch; treat them as absent for this tool.
+fn local<T: Clone>(mi: &Option<MaybeInherited<T>>) -> Option<T> {
+    mi.as_ref()
+        .and_then(|m| m.as_ref().as_local())
+        .cloned()
 }
 
 pub(crate) async fn crate_metadata(
@@ -54,26 +56,26 @@ pub(crate) async fn crate_metadata(
         return Ok(None);
     };
 
-    let readme = local(pkg.readme.clone()).and_then(|s_or_b| match s_or_b {
+    let readme = local(&pkg.readme).and_then(|s_or_b| match s_or_b {
         cargo_manifest::StringOrBool::String(s) => Some(s),
         cargo_manifest::StringOrBool::Bool(_) => None,
     });
 
     Ok(Some(CrateMetadata {
         name: pkg.name.clone(),
-        version: local(pkg.version.clone()).unwrap_or_else(|| version.to_string()),
-        description: local(pkg.description.clone()),
-        repository: local(pkg.repository.clone()),
-        homepage: local(pkg.homepage.clone()),
-        documentation: local(pkg.documentation.clone()),
-        license: local(pkg.license.clone()),
-        license_file: local(pkg.license_file.clone()),
+        version: local(&pkg.version).unwrap_or_else(|| version.to_string()),
+        description: local(&pkg.description),
+        repository: local(&pkg.repository),
+        homepage: local(&pkg.homepage),
+        documentation: local(&pkg.documentation),
+        license: local(&pkg.license),
+        license_file: local(&pkg.license_file),
         readme,
-        rust_version: local(pkg.rust_version.clone()),
-        edition: local(pkg.edition.clone()).map(|e| e.as_str().to_string()),
-        authors: local(pkg.authors.clone()).unwrap_or_default(),
-        keywords: local(pkg.keywords.clone()).unwrap_or_default(),
-        categories: local(pkg.categories.clone()).unwrap_or_default(),
+        rust_version: local(&pkg.rust_version),
+        edition: local(&pkg.edition).map(|e| e.as_str().to_string()),
+        authors: local(&pkg.authors).unwrap_or_default(),
+        keywords: local(&pkg.keywords).unwrap_or_default(),
+        categories: local(&pkg.categories).unwrap_or_default(),
     }))
 }
 
