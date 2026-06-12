@@ -22,6 +22,7 @@ pub(crate) async fn fetch_crate(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<PathBuf>> {
+    // TODO: optimization: use crate file in cargo cache, if it exists.
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate, &version);
@@ -47,11 +48,7 @@ pub(crate) async fn fetch_crate(
     Ok(Some(target_path))
 }
 
-pub(crate) async fn extract_source(
-    path: impl AsRef<Path>,
-    name: &str,
-    version: &str,
-) -> Result<PathBuf> {
+async fn extract_source(path: impl AsRef<Path>, name: &str, version: &str) -> Result<PathBuf> {
     let path = path.as_ref().to_path_buf();
     let output_dir = path.parent().unwrap().join("extracted");
     let source_path = output_dir.join(format!("{name}-{version}"));
@@ -91,6 +88,19 @@ pub(crate) async fn fetch_source(
     Ok(Some(source_dir))
 }
 
+pub(crate) async fn parse_cargo_manifest(
+    source_dir: impl AsRef<Path>,
+) -> Result<Option<cargo_manifest::Manifest>> {
+    let cargo_toml = source_dir.as_ref().join("Cargo.toml");
+    if !cargo_toml.exists() {
+        return Ok(None);
+    }
+
+    let bytes = tokio::fs::read(&cargo_toml).await?;
+    let manifest = cargo_manifest::Manifest::from_slice(&bytes).context("parsing Cargo.toml")?;
+    Ok(Some(manifest))
+}
+
 /// Convenience: fetch the crate archive (if needed), read `Cargo.toml`, and
 /// parse it into the typed `cargo_manifest::Manifest`. Pure parser — does
 /// not shell out to `cargo`. Returns `Ok(None)` when the crate/version isn't
@@ -104,14 +114,7 @@ pub(crate) async fn fetch_cargo_manifest(
         return Ok(None);
     };
 
-    let cargo_toml = source_dir.join("Cargo.toml");
-    if !cargo_toml.exists() {
-        return Ok(None);
-    }
-
-    let bytes = tokio::fs::read(&cargo_toml).await?;
-    let manifest = cargo_manifest::Manifest::from_slice(&bytes).context("parsing Cargo.toml")?;
-    Ok(Some(manifest))
+    parse_cargo_manifest(&source_dir).await
 }
 
 #[cfg(test)]

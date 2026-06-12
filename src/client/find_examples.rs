@@ -1,5 +1,5 @@
 use crate::{
-    client::get_source::{extract_source, fetch_cargo_manifest, fetch_crate},
+    client::get_source::{fetch_source, parse_cargo_manifest},
     config::Config,
 };
 use anyhow::Result;
@@ -32,19 +32,16 @@ pub(crate) async fn find_examples(
     version: &semver::Version,
     include_content: bool,
 ) -> Result<Option<Vec<Example>>> {
-    let Some(archive_path) = fetch_crate(config, krate, version).await? else {
+    let Some(source_dir) = fetch_source(config, krate, version).await? else {
         return Ok(None);
     };
 
-    let Some(manifest) = fetch_cargo_manifest(config, krate, version).await? else {
-        return Ok(None);
-    };
-
-    let version_str = version.to_string();
-    let source_dir = extract_source(&archive_path, krate, &version_str).await?;
     // `from_path` calls `complete_from_path` under the hood — fills in
     // auto-discovered examples from `examples/*.rs`.
     // let manifest = cargo_manifest::Manifest::from_path(source_dir.join("Cargo.toml"))?;
+    let Some(manifest) = parse_cargo_manifest(&source_dir).await? else {
+        return Ok(None);
+    };
 
     if manifest.example.is_empty() {
         return Ok(None);
@@ -58,7 +55,7 @@ pub(crate) async fn find_examples(
         let Some(name) = product.name else { continue };
         let abs_path = source_dir.join(&rel_path);
         let content = if include_content {
-            Some(std::fs::read_to_string(&abs_path)?)
+            Some(tokio::fs::read_to_string(&abs_path).await?)
         } else {
             None
         };
