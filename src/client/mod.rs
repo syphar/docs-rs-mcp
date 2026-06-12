@@ -1,6 +1,11 @@
+pub(crate) mod changelog;
+pub(crate) mod crate_metadata;
+pub(crate) mod dependency_tree;
+pub(crate) mod find_examples;
 pub(crate) mod get_docs;
 pub(crate) mod get_item;
 pub(crate) mod get_source;
+pub(crate) mod inspect_feature_flags;
 pub(crate) mod list_implementors;
 pub(crate) mod list_impls;
 pub(crate) mod list_methods;

@@ -1,7 +1,12 @@
 use crate::{
     config::Config,
     tools::{
+        changelog::{self, ChangelogArgs},
+        crate_metadata::{self, CrateMetadataArgs},
+        dependency_tree::{self, DependencyTreeArgs},
+        find_examples::{self, FindExamplesArgs},
         get_item::{self, GetItemArgs},
+        inspect_feature_flags::{self, InspectFeatureFlagsArgs},
         list_implementors::{self, ListImplementorsArgs},
         list_impls::{self, ListImplsArgs},
         list_methods::{self, ListMethodsArgs},
@@ -254,6 +259,97 @@ Requires an exact `version` and uses the same `target` defaulting/fallback as ot
     ) -> Result<CallToolResult, McpError> {
         list_implementors::handle(&self.config, args).await
     }
+
+    #[tool(
+        description = "\
+Answer *\"how do I enable feature X?\"*, *\"what features does this crate have?\"*, *\"does \
+this crate need `tokio/macros`?\"*. Reads the `[features]` section from the crate's \
+`Cargo.toml`.
+
+Each row is `{name, enables, default}`:
+  - `enables`: the verbatim entries Cargo will activate (other features, `dep:foo` syntax for \
+    optional deps, `foo/bar` for transitive feature activation).
+  - `default`: true when this feature is in the crate's `default` feature set.
+
+Requires an exact `version` (the published Cargo.toml on crates.io for that release)."
+    )]
+    async fn inspect_feature_flags(
+        &self,
+        Parameters(args): Parameters<InspectFeatureFlagsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        inspect_feature_flags::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+Quick orientation for a crate: name, version, description, repository, homepage, license, \
+documentation URL, MSRV (`rust-version`), edition, authors, keywords, categories. Reads the \
+`[package]` section from the crate's `Cargo.toml` on crates.io.
+
+Use this when the user asks *\"what is this crate?\"* / *\"who maintains it?\"* / *\"what's \
+the MSRV?\"* / *\"what license?\"*."
+    )]
+    async fn crate_metadata(
+        &self,
+        Parameters(args): Parameters<CrateMetadataArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        crate_metadata::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+Direct dependencies of a crate (one level, not transitive). Useful for *\"what does this \
+crate pull in?\"* / *\"is X already a dep of Y?\"*. Reads `[dependencies]`, \
+`[dev-dependencies]`, `[build-dependencies]`, and target-gated sections from `Cargo.toml`.
+
+Each row: `{name, kind: \"normal\"|\"dev\"|\"build\", req, optional, default_features, \
+features, target?}`. `target` is set when the dep is gated under \
+`[target.'cfg(...)'.dependencies]`. The name `dependency_tree` is aspirational — this is a \
+flat one-level list, not a recursive tree."
+    )]
+    async fn dependency_tree(
+        &self,
+        Parameters(args): Parameters<DependencyTreeArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        dependency_tree::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+Return the crate's changelog content. Tries common filenames (`CHANGELOG.md`, `CHANGES.md`, \
+`HISTORY.md`, `NEWS.md`, and their extensionless variants) and returns the first that exists.
+
+When `section_version` is provided, returns only the heading section that mentions that \
+version string — best-effort heuristic against markdown heading syntax. Omit it for the \
+full changelog.
+
+Use this for *\"what changed in 1.4?\"* / *\"any breaking changes between 0.7 and 0.8?\"* / \
+*\"is there a CHANGELOG?\"*."
+    )]
+    async fn changelog(
+        &self,
+        Parameters(args): Parameters<ChangelogArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        changelog::handle(&self.config, args).await
+    }
+
+    #[tool(
+        description = "\
+List `.rs` files under the crate's `examples/` directory. Many crates publish runnable \
+examples here — real working code is often more useful than doctest fragments.
+
+Each row: `{path, name, content?}`. `name` is the file stem (or directory name for \
+multi-file examples). `content` is only included when `include_content=true`.
+
+Use this for *\"show me how to use this crate\"* / *\"are there full working examples?\"* — \
+preferable to extracting doctests when the crate ships proper examples."
+    )]
+    async fn find_examples(
+        &self,
+        Parameters(args): Parameters<FindExamplesArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        find_examples::handle(&self.config, args).await
+    }
 }
 
 #[tool_handler]
@@ -284,7 +380,12 @@ impl ServerHandler for DocsServer {
                  - \"what implements this trait\" / \"which types are X\" → `list_implementors`.\n   \
                  - \"what's in module X\" / \"what does X re-export\" → `list_module`.\n   \
                  - \"find X\" / \"is there a Y in this crate\" → `search_items`.\n   \
-                 - \"show me X's signature/docs/examples\" → `get_item`.\n\
+                 - \"show me X's signature/docs/examples\" → `get_item`.\n   \
+                 - \"what features does X have\" / \"how do I enable X\" → `inspect_feature_flags`.\n   \
+                 - \"what is this crate\" / \"MSRV / license / repo\" → `crate_metadata`.\n   \
+                 - \"what does X depend on\" → `dependency_tree`.\n   \
+                 - \"what changed in X\" / \"any breaking changes\" → `changelog`.\n   \
+                 - \"show me a working example\" → `find_examples` first, fall back to `get_item` doctests.\n\
                  \n\
                  The `target` arg on the drill-in tools defaults to the host the server was \
                  compiled for (usually the user's machine). Override when the user's \

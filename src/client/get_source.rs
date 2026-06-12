@@ -18,7 +18,7 @@ pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
     format!("/crates/{krate}/{krate}-{version}.crate")
 }
 
-async fn fetch_crate(
+pub(crate) async fn fetch_crate(
     config: &Config,
     krate: &str,
     version: &semver::Version,
@@ -52,7 +52,7 @@ async fn fetch_crate(
 /// matched against the archive entry path *with the top-level
 /// `<krate>-<version>/` prefix stripped*, so pass e.g. `"Cargo.toml"` or
 /// `"examples/hello.rs"`.
-async fn fetch_from_source(
+pub(crate) async fn fetch_from_source(
     path: impl AsRef<Path>,
     find_path: impl AsRef<Path>,
 ) -> Result<Option<Vec<u8>>> {
@@ -79,6 +79,52 @@ async fn fetch_from_source(
         return Ok(None);
     })
     .await?
+}
+
+/// List archive entries whose path (with the leading `<krate>-<version>/`
+/// prefix stripped) starts with `prefix`. Returns the relative paths.
+pub(crate) async fn list_entries(
+    path: impl AsRef<Path>,
+    prefix: impl AsRef<Path>,
+) -> Result<Vec<PathBuf>> {
+    let path = path.as_ref().to_path_buf();
+    let prefix = prefix.as_ref().to_path_buf();
+    spawn_blocking(move || -> Result<Vec<PathBuf>> {
+        let tar_gz = File::open(&path)
+            .with_context(|| format!("opening crate archive {}", path.display()))?;
+        let mut archive = Archive::new(GzDecoder::new(tar_gz));
+        let mut out = Vec::new();
+        for entry in archive.entries()? {
+            let entry = entry?;
+            let entry_path = entry.path()?.to_path_buf();
+            let mut components = entry_path.components();
+            let _root = components.next();
+            let relative: PathBuf = components.collect();
+            if relative.starts_with(&prefix) {
+                out.push(relative);
+            }
+        }
+        Ok(out)
+    })
+    .await?
+}
+
+/// Convenience: fetch the crate archive (if needed), read `Cargo.toml`, and
+/// parse it. Returns `Ok(None)` when the crate/version isn't on crates.io.
+pub(crate) async fn fetch_cargo_toml(
+    config: &Config,
+    krate: &str,
+    version: &semver::Version,
+) -> Result<Option<toml::Value>> {
+    let Some(archive_path) = fetch_crate(config, krate, version).await? else {
+        return Ok(None);
+    };
+    let Some(bytes) = fetch_from_source(&archive_path, "Cargo.toml").await? else {
+        return Ok(None);
+    };
+    let text = std::str::from_utf8(&bytes).context("Cargo.toml is not valid UTF-8")?;
+    let value: toml::Value = toml::from_str(text).context("parsing Cargo.toml")?;
+    Ok(Some(value))
 }
 
 #[cfg(test)]
