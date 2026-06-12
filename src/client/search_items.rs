@@ -282,6 +282,51 @@ fn emit_external_reexport(
     });
 }
 
+/// External crate referenced by a glob re-export whose target lives outside
+/// `docs.index`. To fully expand such a re-export you'd need to fetch this
+/// crate's own rustdoc JSON.
+#[derive(Debug, Serialize)]
+pub(crate) struct NeededCrate {
+    pub(crate) name: String,
+    /// Version parsed from `html_root_url` if it looks like a docs.rs URL.
+    /// `None` for stdlib, path/git deps, or unusual root URLs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) version: Option<String>,
+    /// Raw `html_root_url` from rustdoc, kept for debugging / non-docs.rs URLs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) html_root_url: Option<String>,
+}
+
+/// Crates whose rustdoc JSON would be needed to fully expand the glob
+/// re-exports of `docs` that target external crates.
+pub(crate) fn needed_crates(docs: &rustdoc_types::Crate) -> Vec<NeededCrate> {
+    let ids: HashSet<u32> = docs
+        .index
+        .values()
+        .filter_map(|item| match &item.inner {
+            ItemEnum::Use(u) if u.is_glob => u.id,
+            _ => None,
+        })
+        .filter(|target_id| !docs.index.contains_key(target_id))
+        .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
+        .collect();
+
+    let mut result: Vec<NeededCrate> = ids
+        .into_iter()
+        .filter_map(|id| docs.external_crates.get(&id))
+        .map(|ec| NeededCrate {
+            name: ec.name.clone(),
+            version: ec
+                .html_root_url
+                .as_deref()
+                .and_then(parse_version_from_docs_rs_url),
+            html_root_url: ec.html_root_url.clone(),
+        })
+        .collect();
+    result.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.version.cmp(&b.version)));
+    result
+}
+
 fn resolve_through_uses<'a>(
     docs: &'a rustdoc_types::Crate,
     item: &'a rustdoc_types::Item,
@@ -410,6 +455,20 @@ mod tests {
     async fn test_list_traits() -> Result<()> {
         let docs = docs_fixture("axum_0.8.9.json.zst").await?;
 
+        let needed: HashSet<_> = docs
+            .index
+            .values()
+            .filter_map(|item| match &item.inner {
+                ItemEnum::Use(u) if u.is_glob => u.id,
+                _ => None,
+            })
+            .filter(|target_id| !docs.index.contains_key(target_id))
+            // .filter_map(|target_id| docs.paths.get(&target_id).map(|s| s.crate_id))
+            .filter_map(|target_id| docs.paths.get(&target_id))
+            .collect();
+
+        dbg!(&needed);
+
         let results = search(&docs, None, Some(ItemKind::Trait), None);
 
         assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
@@ -442,6 +501,8 @@ mod tests {
                 "axum::service_ext::ServiceExt",
             ]
         );
+
+        panic!();
 
         Ok(())
     }
