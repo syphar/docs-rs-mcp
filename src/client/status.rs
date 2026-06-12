@@ -12,8 +12,10 @@ pub(crate) struct Status {
 pub(crate) async fn get_docs_status(
     config: &Config,
     krate: &str,
-    req_version: &semver::VersionReq,
+    req_version: impl Into<&semver::VersionReq>,
 ) -> Result<Option<Status>> {
+    let req_version = req_version.into();
+
     let response = CLIENT
         .get(
             config
@@ -33,7 +35,6 @@ pub(crate) async fn get_docs_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semver_types::VersionReq;
     use reqwest::Url;
 
     #[tokio::test]
@@ -59,7 +60,12 @@ mod tests {
         };
 
         assert_eq!(
-            get_docs_status(&config, "itertools", &VersionReq::parse("1.2.3").unwrap()).await?,
+            get_docs_status(
+                &config,
+                "itertools",
+                &semver::VersionReq::parse("1.2.3").unwrap(),
+            )
+            .await?,
             Some(status)
         );
 
