@@ -9,6 +9,11 @@ pub(crate) struct Match {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) kind: ItemKind,
+    /// Values declared with `#[doc(alias = "...")]` on the item. These are
+    /// also matched by `query` — e.g. searching `"map"` finds `BTreeMap` if
+    /// the author aliased it that way. Empty when the item has no aliases.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub(crate) aliases: Vec<String>,
     /// Set when this match was reached via a `pub use` re-export rather than
     /// the item's canonical path. Carries info about where the item originally
     /// lives.
@@ -56,8 +61,9 @@ pub(crate) fn search(
                 .map(|summary| summary.path.join("::"))
                 .or_else(|| item.name.clone())?;
             let name = item.name.clone().unwrap_or_default();
+            let aliases = aliases_of(item);
 
-            if !matches_query(query_lower.as_deref(), &name, &path) {
+            if !matches_query(query_lower.as_deref(), &name, &path, &aliases) {
                 return None;
             }
 
@@ -66,6 +72,7 @@ pub(crate) fn search(
                 name,
                 path,
                 kind,
+                aliases,
                 reexport: None,
             })
         })
@@ -87,11 +94,53 @@ pub(crate) fn search(
     matches
 }
 
-fn matches_query(query: Option<&str>, name: &str, path: &str) -> bool {
-    match query {
-        Some(q) => format!("{name} {path}").to_lowercase().contains(q),
-        None => true,
+fn matches_query(query: Option<&str>, name: &str, path: &str, aliases: &[String]) -> bool {
+    let Some(q) = query else { return true };
+    let mut haystack = format!("{name} {path}");
+    for a in aliases {
+        haystack.push(' ');
+        haystack.push_str(a);
     }
+    haystack.to_lowercase().contains(q)
+}
+
+/// Extract `#[doc(alias = "...")]` and `#[doc(alias("a", "b"))]` values from
+/// an item's pretty-printed attribute strings. Returns an empty vec when none.
+fn aliases_of(item: &rustdoc_types::Item) -> Vec<String> {
+    item.attrs
+        .iter()
+        .filter_map(|a| match a {
+            rustdoc_types::Attribute::Other(s) => Some(s),
+            _ => None,
+        })
+        .filter(|s| s.contains("doc(alias"))
+        .flat_map(|s| extract_quoted_strings(s))
+        .collect()
+}
+
+fn extract_quoted_strings(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '"' {
+            continue;
+        }
+        let mut acc = String::new();
+        let mut escaped = false;
+        for ch in chars.by_ref() {
+            match (escaped, ch) {
+                (true, _) => {
+                    acc.push(ch);
+                    escaped = false;
+                }
+                (false, '\\') => escaped = true,
+                (false, '"') => break,
+                (false, _) => acc.push(ch),
+            }
+        }
+        out.push(acc);
+    }
+    out
 }
 
 fn collect_reexports(
@@ -249,7 +298,8 @@ fn emit_reexport(
         return;
     }
     let path = join_path(prefix, name);
-    if !matches_query(query, name, &path) {
+    let aliases = aliases_of(resolved);
+    if !matches_query(query, name, &path, &aliases) {
         return;
     }
     out.push(Match {
@@ -257,6 +307,7 @@ fn emit_reexport(
         name: name.to_string(),
         path,
         kind,
+        aliases,
         reexport: Some(reexport_info(docs, resolved)),
     });
 }
@@ -278,7 +329,9 @@ fn emit_external_reexport(
         return;
     }
     let path = join_path(prefix, name);
-    if !matches_query(query, name, &path) {
+    // Aliases aren't available for cross-crate items — we only have the path
+    // summary, not the full Item with its attrs.
+    if !matches_query(query, name, &path, &[]) {
         return;
     }
 
@@ -288,6 +341,7 @@ fn emit_external_reexport(
         name: name.to_string(),
         path,
         kind,
+        aliases: Vec::new(),
         reexport: Some(Reexport {
             source_crate: ext.map(|e| e.name.clone()),
             source_version: ext

@@ -43,7 +43,8 @@ Search rustdoc items for a crate version by name or path, optionally filtering b
 Requires an exact version — call `resolve_version` first if you only have a semver requirement.
 
 Each result has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), \
-`kind` (`struct`, `trait`, `function`, ...), and optionally `reexport`.
+`kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via \
+`#[doc(alias = \"...\")]`; the query also matches against these), and optionally `reexport`.
 
 Re-exports (`pub use ...`) are first-class. The same item may appear at multiple paths: \
 its canonical definition and every `pub use` that re-exports it. Each path is independently \
