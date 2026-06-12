@@ -1,6 +1,7 @@
 use crate::types::rustdoc_types::ItemKind;
-use rustdoc_types::Id;
+use rustdoc_types::{Id, ItemEnum};
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Match {
@@ -8,6 +9,23 @@ pub(crate) struct Match {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) kind: ItemKind,
+    /// Set when this match was reached via a `pub use` re-export rather than
+    /// the item's canonical path. Carries info about where the item originally
+    /// lives.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) reexport: Option<Reexport>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct Reexport {
+    /// Crate where the original item is defined. `None` if it lives in the
+    /// same crate as the rustdoc JSON being searched.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) source_crate: Option<String>,
+    /// Version of the source crate, parsed from its `html_root_url` if it
+    /// looks like a docs.rs URL.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) source_version: Option<String>,
 }
 
 pub(crate) fn search(
@@ -16,12 +34,17 @@ pub(crate) fn search(
     kind_filter: Option<ItemKind>,
     limit: Option<usize>,
 ) -> Vec<Match> {
-    let query = query.map(|q| q.to_lowercase());
+    let query_lower = query.map(|q| q.to_lowercase());
 
-    let mut matches = docs
+    let mut matches: Vec<Match> = docs
         .index
         .values()
         .filter_map(|item| {
+            // Re-exports are handled separately below.
+            if matches!(item.inner, ItemEnum::Use(_)) {
+                return None;
+            }
+
             let kind: ItemKind = item.inner.item_kind().into();
             if kind_filter.is_some_and(|filter| filter != kind) {
                 return None;
@@ -33,25 +56,22 @@ pub(crate) fn search(
                 .map(|summary| summary.path.join("::"))
                 .or_else(|| item.name.clone())?;
             let name = item.name.clone().unwrap_or_default();
-            let haystack = format!("{name} {path}").to_lowercase();
 
-            if let Some(query) = &query {
-                haystack.contains(query).then_some(Match {
-                    id: item.id,
-                    name,
-                    path,
-                    kind,
-                })
-            } else {
-                Some(Match {
-                    id: item.id,
-                    name,
-                    path,
-                    kind,
-                })
+            if !matches_query(query_lower.as_deref(), &name, &path) {
+                return None;
             }
+
+            Some(Match {
+                id: item.id,
+                name,
+                path,
+                kind,
+                reexport: None,
+            })
         })
-        .collect::<Vec<_>>();
+        .collect();
+
+    collect_reexports(docs, query_lower.as_deref(), kind_filter, &mut matches);
 
     matches.sort_by(|left, right| {
         left.path
@@ -65,6 +85,209 @@ pub(crate) fn search(
     }
 
     matches
+}
+
+fn matches_query(query: Option<&str>, name: &str, path: &str) -> bool {
+    match query {
+        Some(q) => format!("{name} {path}").to_lowercase().contains(q),
+        None => true,
+    }
+}
+
+fn collect_reexports(
+    docs: &rustdoc_types::Crate,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+    out: &mut Vec<Match>,
+) {
+    // Canonical path for every in-crate module, used as the prefix for paths
+    // we synthesize for re-exports.
+    let module_paths: HashMap<Id, String> = docs
+        .index
+        .iter()
+        .filter(|(_, item)| matches!(item.inner, ItemEnum::Module(_)))
+        .filter_map(|(id, _)| docs.paths.get(id).map(|s| (*id, s.path.join("::"))))
+        .collect();
+
+    // Parent module for each child Id, so we can find the path a `Use` sits in.
+    let mut parent_of: HashMap<Id, Id> = HashMap::new();
+    for item in docs.index.values() {
+        if let ItemEnum::Module(m) = &item.inner {
+            for child in &m.items {
+                parent_of.insert(*child, item.id);
+            }
+        }
+    }
+
+    let use_ids: Vec<Id> = docs
+        .index
+        .iter()
+        .filter(|(_, item)| matches!(item.inner, ItemEnum::Use(_)))
+        .map(|(id, _)| *id)
+        .collect();
+
+    for use_id in use_ids {
+        let parent_path = parent_of
+            .get(&use_id)
+            .and_then(|p| module_paths.get(p))
+            .cloned()
+            .unwrap_or_default();
+        // Per-top-level visited set: cycle protection without preventing a
+        // given Use from being emitted under multiple distinct paths.
+        let mut visited = HashSet::new();
+        expand_use(
+            docs,
+            use_id,
+            &parent_path,
+            &mut visited,
+            out,
+            query,
+            kind_filter,
+        );
+    }
+}
+
+fn expand_use(
+    docs: &rustdoc_types::Crate,
+    use_id: Id,
+    prefix: &str,
+    visited: &mut HashSet<Id>,
+    out: &mut Vec<Match>,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+) {
+    if !visited.insert(use_id) {
+        return;
+    }
+
+    let Some(item) = docs.index.get(&use_id) else {
+        return;
+    };
+    let ItemEnum::Use(u) = &item.inner else {
+        return;
+    };
+    let Some(target_id) = u.id else {
+        // External target rustdoc couldn't resolve into the index.
+        return;
+    };
+    let Some(target) = docs.index.get(&target_id) else {
+        return;
+    };
+
+    if !u.is_glob {
+        emit_reexport(docs, target, &u.name, prefix, out, query, kind_filter);
+        // Re-export chains: `pub use a::b;` where `b` is itself a `use`.
+        if matches!(target.inner, ItemEnum::Use(_)) {
+            let new_prefix = join_path(prefix, &u.name);
+            expand_use(
+                docs,
+                target_id,
+                &new_prefix,
+                visited,
+                out,
+                query,
+                kind_filter,
+            );
+        }
+        return;
+    }
+
+    // Glob: target must be a module. Enumerate its children at `prefix`.
+    let ItemEnum::Module(m) = &target.inner else {
+        return;
+    };
+    for child_id in &m.items {
+        let Some(child) = docs.index.get(child_id) else {
+            continue;
+        };
+        if matches!(child.inner, ItemEnum::Use(_)) {
+            expand_use(docs, *child_id, prefix, visited, out, query, kind_filter);
+        } else {
+            let Some(name) = child.name.as_deref() else {
+                continue;
+            };
+            emit_reexport(docs, child, name, prefix, out, query, kind_filter);
+        }
+    }
+}
+
+fn emit_reexport(
+    docs: &rustdoc_types::Crate,
+    target: &rustdoc_types::Item,
+    name: &str,
+    prefix: &str,
+    out: &mut Vec<Match>,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+) {
+    let Some(resolved) = resolve_through_uses(docs, target) else {
+        return;
+    };
+    let kind: ItemKind = resolved.inner.item_kind().into();
+    if kind_filter.is_some_and(|filter| filter != kind) {
+        return;
+    }
+    let path = join_path(prefix, name);
+    if !matches_query(query, name, &path) {
+        return;
+    }
+    out.push(Match {
+        id: resolved.id,
+        name: name.to_string(),
+        path,
+        kind,
+        reexport: Some(reexport_info(docs, resolved)),
+    });
+}
+
+fn resolve_through_uses<'a>(
+    docs: &'a rustdoc_types::Crate,
+    item: &'a rustdoc_types::Item,
+) -> Option<&'a rustdoc_types::Item> {
+    let mut current = item;
+    for _ in 0..32 {
+        match &current.inner {
+            ItemEnum::Use(u) => {
+                let target_id = u.id?;
+                current = docs.index.get(&target_id)?;
+            }
+            _ => return Some(current),
+        }
+    }
+    None
+}
+
+fn join_path(prefix: &str, name: &str) -> String {
+    if prefix.is_empty() {
+        name.to_string()
+    } else {
+        format!("{prefix}::{name}")
+    }
+}
+
+fn reexport_info(docs: &rustdoc_types::Crate, target: &rustdoc_types::Item) -> Reexport {
+    if target.crate_id == 0 {
+        return Reexport {
+            source_crate: None,
+            source_version: None,
+        };
+    }
+    let ext = docs.external_crates.get(&target.crate_id);
+    Reexport {
+        source_crate: ext.map(|e| e.name.clone()),
+        source_version: ext
+            .and_then(|e| e.html_root_url.as_deref())
+            .and_then(parse_version_from_docs_rs_url),
+    }
+}
+
+fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
+    // Expected shape: https://docs.rs/<crate>/<version>/<crate>/
+    let rest = url.strip_prefix("https://docs.rs/")?;
+    let mut parts = rest.split('/');
+    parts.next()?; // crate
+    let version = parts.next()?;
+    (!version.is_empty()).then(|| version.to_string())
 }
 
 #[cfg(test)]
@@ -151,12 +374,16 @@ mod tests {
         assert_eq!(
             results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
             vec![
+                "axum::ServiceExt",
                 "axum::extract::connect_info::Connected",
                 "axum::extract::ws::OnFailedUpgrade",
                 "axum::handler::Handler",
                 "axum::handler::HandlerWithoutStateExt",
+                "axum::middleware::IntoMapRequestResult",
                 "axum::middleware::map_request::IntoMapRequestResult",
                 "axum::middleware::map_request::private::Sealed",
+                "axum::serve::Listener",
+                "axum::serve::ListenerExt",
                 "axum::serve::listener::Listener",
                 "axum::serve::listener::ListenerExt",
                 "axum::service_ext::ServiceExt",
