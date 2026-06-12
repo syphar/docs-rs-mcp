@@ -167,10 +167,16 @@ fn expand_use(
         return;
     };
     let Some(target_id) = u.id else {
-        // External target rustdoc couldn't resolve into the index.
+        // rustdoc couldn't resolve the re-export at all.
         return;
     };
     let Some(target) = docs.index.get(&target_id) else {
+        // Target lives in an external crate — not in `index`, but usually
+        // present in `paths`. Emit from the path summary (no glob expansion
+        // possible because we don't have the source crate's items).
+        if !u.is_glob {
+            emit_external_reexport(docs, target_id, &u.name, prefix, out, query, kind_filter);
+        }
         return;
     };
 
@@ -237,6 +243,42 @@ fn emit_reexport(
         path,
         kind,
         reexport: Some(reexport_info(docs, resolved)),
+    });
+}
+
+fn emit_external_reexport(
+    docs: &rustdoc_types::Crate,
+    target_id: Id,
+    name: &str,
+    prefix: &str,
+    out: &mut Vec<Match>,
+    query: Option<&str>,
+    kind_filter: Option<ItemKind>,
+) {
+    let Some(summary) = docs.paths.get(&target_id) else {
+        return;
+    };
+    let kind: ItemKind = summary.kind.clone().into();
+    if kind_filter.is_some_and(|filter| filter != kind) {
+        return;
+    }
+    let path = join_path(prefix, name);
+    if !matches_query(query, name, &path) {
+        return;
+    }
+
+    let ext = docs.external_crates.get(&summary.crate_id);
+    out.push(Match {
+        id: target_id,
+        name: name.to_string(),
+        path,
+        kind,
+        reexport: Some(Reexport {
+            source_crate: ext.map(|e| e.name.clone()),
+            source_version: ext
+                .and_then(|e| e.html_root_url.as_deref())
+                .and_then(parse_version_from_docs_rs_url),
+        }),
     });
 }
 
@@ -374,7 +416,15 @@ mod tests {
         assert_eq!(
             results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
             vec![
+                "axum::RequestExt",
+                "axum::RequestPartsExt",
                 "axum::ServiceExt",
+                "axum::body::HttpBody",
+                "axum::extract::FromRef",
+                "axum::extract::FromRequest",
+                "axum::extract::FromRequestParts",
+                "axum::extract::OptionalFromRequest",
+                "axum::extract::OptionalFromRequestParts",
                 "axum::extract::connect_info::Connected",
                 "axum::extract::ws::OnFailedUpgrade",
                 "axum::handler::Handler",
@@ -382,6 +432,8 @@ mod tests {
                 "axum::middleware::IntoMapRequestResult",
                 "axum::middleware::map_request::IntoMapRequestResult",
                 "axum::middleware::map_request::private::Sealed",
+                "axum::response::IntoResponse",
+                "axum::response::IntoResponseParts",
                 "axum::serve::Listener",
                 "axum::serve::ListenerExt",
                 "axum::serve::listener::Listener",
