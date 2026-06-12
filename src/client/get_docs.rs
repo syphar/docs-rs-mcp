@@ -14,8 +14,8 @@ use tokio::{
 use tokio_util::io::StreamReader;
 use tracing::debug;
 
-pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
-    format!("/crate/{krate}/{version}/json.zst")
+pub(crate) fn build_download_url(krate: &str, version: &str, target: &str) -> String {
+    format!("/crate/{krate}/{version}/{target}/json.zst")
 }
 
 /// standard method for crates.io index to get the folder for a crate,
@@ -37,11 +37,15 @@ async fn fetch_rustdoc_json(
     config: &Config,
     krate: &str,
     version: &semver::Version,
+    target: &str,
 ) -> Result<PathBuf> {
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&config.cache_dir, krate);
-    let target_path = target_dir.join(&version).with_extension("json.zst");
+    let target_path = target_dir
+        .join(&version)
+        .join(&target)
+        .with_extension("json.zst");
 
     if fs::try_exists(&target_path).await? {
         debug!(target_path = %target_path.display(), "found rustdoc json");
@@ -51,7 +55,7 @@ async fn fetch_rustdoc_json(
     fs::create_dir_all(&target_dir).await?;
     let url = config
         .docs_rs_server
-        .join(&build_download_url(krate, &version))
+        .join(&build_download_url(krate, &version, &target))
         .context("can't build download url")?;
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
@@ -65,8 +69,9 @@ pub(crate) async fn get_docs(
     config: &Config,
     krate: &str,
     version: &semver::Version,
+    target: &str,
 ) -> Result<rustdoc_types::Crate> {
-    let path = fetch_rustdoc_json(config, krate, version).await?;
+    let path = fetch_rustdoc_json(config, krate, version, target).await?;
 
     let krate = spawn_blocking(move || -> Result<_, anyhow::Error> {
         let file = std::fs::File::open(&path)?;

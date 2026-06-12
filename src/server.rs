@@ -42,6 +42,12 @@ impl DocsServer {
 Search rustdoc items for a crate version by name or path, optionally filtering by item kind.
 Requires an exact version — call `resolve_version` first if you only have a semver requirement.
 
+Defaults to fetching docs for `x86_64-unknown-linux-gnu` (docs.rs's default platform and the \
+most common deployment target). Override via the `target` arg when the user's project targets \
+something else — check their `Cargo.toml [build] target`, a `.cargo/config.toml`, or whatever \
+they've said about deployment. Using the wrong target hides items gated on `#[cfg(target_os = \
+...)]` and can surface items that won't compile on the real target.
+
 Each result has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), \
 `kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via \
 `#[doc(alias = \"...\")]`; the query also matches against these), and optionally `reexport`.

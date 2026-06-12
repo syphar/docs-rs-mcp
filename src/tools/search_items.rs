@@ -6,6 +6,11 @@ use crate::{
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
+/// docs.rs's own default platform when no `?platform=` is given. Almost
+/// every published crate has docs built for this target, and it's where most
+/// Rust apps actually deploy.
+const DEFAULT_TARGET: &str = "x86_64-unknown-linux-gnu";
+
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct SearchItemsArgs {
     /// Name of the crate on crates.io / docs.rs.
@@ -28,6 +33,17 @@ pub(crate) struct SearchItemsArgs {
     /// Maximum number of matches to return. Defaults to 20.
     #[serde(default = "default_limit")]
     pub(crate) limit: usize,
+    /// Target triple to fetch docs for (e.g. `"x86_64-unknown-linux-gnu"`,
+    /// `"aarch64-apple-darwin"`, `"x86_64-pc-windows-msvc"`). Defaults to
+    /// `x86_64-unknown-linux-gnu` — docs.rs's default and the most common
+    /// deployment target. Override when the user's project targets something
+    /// else (look at their `Cargo.toml` `[build] target = ...`, a
+    /// `.cargo/config.toml`, or whatever they've told you about deployment).
+    /// Target matters because `#[cfg(target_os = ...)]` items differ — using
+    /// the wrong target hides Linux-only `tokio::net::UnixListener` methods,
+    /// or surfaces Windows-only items that won't compile on Linux.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) target: Option<String>,
 }
 
 fn default_limit() -> usize {
@@ -49,7 +65,8 @@ pub(crate) async fn handle(
     config: &Config,
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
-    let docs = get_docs(config, &args.krate, args.version.as_ref())
+    let target = args.target.as_deref().unwrap_or(DEFAULT_TARGET);
+    let docs = get_docs(config, &args.krate, args.version.as_ref(), target)
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 
