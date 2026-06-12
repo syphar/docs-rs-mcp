@@ -67,4 +67,27 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_not_found() -> Result<()> {
+        let mut env = test_env().await?;
+
+        let _mock = env
+            .server
+            .mock("GET", "/crate/itertools/^1.2.3/status.json")
+            .with_status(404)
+            .create();
+
+        assert!(
+            get_docs_status(
+                env.config(),
+                "itertools",
+                &semver::VersionReq::parse("1.2.3").unwrap(),
+            )
+            .await?
+            .is_none(),
+        );
+
+        Ok(())
+    }
 }
