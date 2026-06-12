@@ -182,3 +182,90 @@ fn external_globs_in(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::docs_fixture;
+    use anyhow::Result;
+
+    #[tokio::test]
+    async fn test_list_crate_root() -> Result<()> {
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+
+        let listing = list_module(&docs, None).expect("axum has a root module");
+
+        let actual: Vec<(String, ItemKind)> = listing
+            .entries
+            .iter()
+            .map(|e| (e.name.clone(), e.kind))
+            .collect();
+
+        pretty_assertions::assert_eq!(
+            actual,
+            vec![
+                ("BoxError".to_string(), ItemKind::TypeAlias),
+                ("Error".to_string(), ItemKind::Struct),
+                ("Extension".to_string(), ItemKind::Struct),
+                ("Form".to_string(), ItemKind::Struct),
+                ("Json".to_string(), ItemKind::Struct),
+                ("RequestExt".to_string(), ItemKind::Trait),
+                ("RequestPartsExt".to_string(), ItemKind::Trait),
+                ("Router".to_string(), ItemKind::Struct),
+                ("ServiceExt".to_string(), ItemKind::Trait),
+                ("body".to_string(), ItemKind::Module),
+                ("debug_handler".to_string(), ItemKind::ProcAttribute),
+                ("debug_middleware".to_string(), ItemKind::ProcAttribute),
+                ("error_handling".to_string(), ItemKind::Module),
+                ("extract".to_string(), ItemKind::Module),
+                ("handler".to_string(), ItemKind::Module),
+                ("http".to_string(), ItemKind::Module),
+                ("middleware".to_string(), ItemKind::Module),
+                ("response".to_string(), ItemKind::Module),
+                ("routing".to_string(), ItemKind::Module),
+                // `serve` is both a module and a free function at the crate root.
+                ("serve".to_string(), ItemKind::Module),
+                ("serve".to_string(), ItemKind::Function),
+                ("test_helpers".to_string(), ItemKind::Module),
+            ]
+        );
+
+        // Spot-check reexport attribution against the same listing.
+        let by_name = |name: &str, kind: ItemKind| {
+            listing
+                .entries
+                .iter()
+                .find(|e| e.name == name && e.kind == kind)
+                .unwrap_or_else(|| panic!("missing entry {name} ({kind:?})"))
+        };
+
+        // Internal re-export: axum::routing::Router → axum::Router.
+        let router = by_name("Router", ItemKind::Struct);
+        let rx = router.reexport.as_ref().expect("Router is a re-export");
+        assert!(rx.source_crate.is_none(), "internal: source_crate is None");
+
+        // External re-export from axum_core.
+        let request_ext = by_name("RequestExt", ItemKind::Trait);
+        let rx = request_ext
+            .reexport
+            .as_ref()
+            .expect("RequestExt is a re-export");
+        assert_eq!(rx.source_crate.as_deref(), Some("axum_core"));
+
+        // Direct child module — defined here, not re-exported.
+        let extract = by_name("extract", ItemKind::Module);
+        assert!(extract.reexport.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_unknown_module_returns_none() -> Result<()> {
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+
+        let path = vec!["axum".to_string(), "no_such_module".to_string()];
+        assert!(list_module(&docs, Some(&path)).is_none());
+
+        Ok(())
+    }
+}
