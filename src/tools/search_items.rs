@@ -1,8 +1,5 @@
 use crate::{
-    client::{
-        get_docs::get_docs,
-        search_items::{SearchItemMatch, search_items},
-    },
+    client::{get_docs::get_docs, search_items},
     config::Config,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
@@ -36,7 +33,7 @@ fn default_limit() -> usize {
 
 #[derive(Debug, Serialize)]
 struct SearchItemsResult {
-    items: Vec<SearchItemMatch>,
+    items: Vec<search_items::Match>,
 }
 
 pub(crate) async fn handle(
@@ -47,7 +44,7 @@ pub(crate) async fn handle(
         .await
         .map_err(|err| McpError::internal_error(err.to_string(), None))?;
 
-    let items = search_items(&docs, &args.query, args.kind, args.limit);
+    let items = search_items::search(&docs, &args.query, args.kind, args.limit);
 
     Ok(CallToolResult::structured(
         serde_json::to_value(SearchItemsResult { items })

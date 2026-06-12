@@ -3,19 +3,19 @@ use rustdoc_types::Id;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
-pub(crate) struct SearchItemMatch {
+pub(crate) struct Match {
     pub(crate) id: Id,
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) kind: ItemKind,
 }
 
-pub(crate) fn search_items(
+pub(crate) fn search(
     docs: &rustdoc_types::Crate,
     query: &str,
     kind_filter: Option<ItemKind>,
     limit: usize,
-) -> Vec<SearchItemMatch> {
+) -> Vec<Match> {
     let query = query.to_lowercase();
 
     let mut matches = docs
@@ -35,7 +35,7 @@ pub(crate) fn search_items(
             let name = item.name.clone().unwrap_or_default();
             let haystack = format!("{name} {path}").to_lowercase();
 
-            haystack.contains(&query).then_some(SearchItemMatch {
+            haystack.contains(&query).then_some(Match {
                 id: item.id,
                 name,
                 path,
