@@ -7,7 +7,12 @@ use rmcp::{ServiceExt, transport::stdio};
 use std::path::{Path, PathBuf};
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_appender::{non_blocking::WorkerGuard, rolling};
-use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter, Layer,
+    fmt::{self, format::FmtSpan},
+    layer::SubscriberExt,
+    util::SubscriberInitExt,
+};
 
 mod client;
 mod context;
@@ -52,6 +57,10 @@ fn init_tracing(config: &Config) -> Result<WorkerGuard> {
         .json()
         .with_ansi(false)
         .with_writer(file_writer)
+        // Emit one JSON line per span close, carrying `time.busy` /
+        // `time.idle` durations. Combined with `#[tracing::instrument]` on
+        // tool handlers, this gives you per-call timing data in the log.
+        .with_span_events(FmtSpan::CLOSE)
         .with_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             EnvFilter::builder()
                 .with_default_directive(LevelFilter::INFO.into())
