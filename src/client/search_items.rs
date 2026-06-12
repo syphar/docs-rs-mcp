@@ -222,15 +222,7 @@ fn expand_module(
             continue;
         };
         if matches!(child.inner, ItemEnum::Use(_)) {
-            expand_use(
-                docs,
-                *child_id,
-                prefix,
-                visited,
-                out,
-                query,
-                kind_filter,
-            );
+            expand_use(docs, *child_id, prefix, visited, out, query, kind_filter);
         } else {
             let Some(name) = child.name.as_deref() else {
                 continue;
@@ -441,7 +433,7 @@ fn parse_version_from_docs_rs_url(url: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::docs_fixture;
+    use crate::test_utils::{docs_fixture, public_api_fixture};
     use anyhow::Result;
     use pretty_assertions::assert_eq;
 
@@ -508,6 +500,57 @@ mod tests {
                 "axum::extract::ws::rejection",
             ]
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_list_traits_new() -> Result<()> {
+        let api = public_api_fixture("axum_0.8.9.json")?;
+
+        let items: Vec<_> = api
+            .into_items()
+            .map(|item| {
+                let tokens: Vec<_> = item.tokens().map(|t| t.text().to_string()).collect();
+                (item.id(), tokens)
+            })
+            .collect();
+        dbg!(&items);
+
+        // let results = search(&docs, None, Some(ItemKind::Trait), None);
+
+        // assert!(results.iter().all(|m| m.kind == ItemKind::Trait));
+
+        // assert_eq!(
+        //     results.into_iter().map(|m| m.path).collect::<Vec<_>>(),
+        //     vec![
+        //         "axum::RequestExt",
+        //         "axum::RequestPartsExt",
+        //         "axum::ServiceExt",
+        //         "axum::body::HttpBody",
+        //         "axum::extract::FromRef",
+        //         "axum::extract::FromRequest",
+        //         "axum::extract::FromRequestParts",
+        //         "axum::extract::OptionalFromRequest",
+        //         "axum::extract::OptionalFromRequestParts",
+        //         "axum::extract::connect_info::Connected",
+        //         "axum::extract::ws::OnFailedUpgrade",
+        //         "axum::handler::Handler",
+        //         "axum::handler::HandlerWithoutStateExt",
+        //         "axum::middleware::IntoMapRequestResult",
+        //         "axum::middleware::map_request::IntoMapRequestResult",
+        //         "axum::middleware::map_request::private::Sealed",
+        //         "axum::response::IntoResponse",
+        //         "axum::response::IntoResponseParts",
+        //         "axum::serve::Listener",
+        //         "axum::serve::ListenerExt",
+        //         "axum::serve::listener::Listener",
+        //         "axum::serve::listener::ListenerExt",
+        //         "axum::service_ext::ServiceExt",
+        //     ]
+        // );
+
+        panic!();
 
         Ok(())
     }

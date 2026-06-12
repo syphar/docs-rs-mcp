@@ -1,6 +1,7 @@
 use crate::config::Config;
 use anyhow::{Result, bail};
 use async_compression::tokio::bufread::ZstdDecoder;
+use public_api::PublicApi;
 use reqwest::Url;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt as _;
@@ -43,6 +44,12 @@ pub(crate) fn fixture(path: impl AsRef<Path>) -> Result<PathBuf> {
     } else {
         Ok(path)
     }
+}
+
+pub(crate) fn public_api_fixture(path: impl AsRef<Path>) -> Result<PublicApi> {
+    let path = fixture(path)?;
+
+    Ok(public_api::Builder::from_rustdoc_json(&path).build()?)
 }
 
 pub(crate) async fn docs_fixture(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
