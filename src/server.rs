@@ -54,7 +54,7 @@ Cargo on one specific case — a bare *fully-qualified* `MAJOR.MINOR.PATCH` is \
 treated as an EXACT match (matching docs.rs URL semantics), not Cargo's caret \
 default. Everything else is parsed as a normal Cargo requirement.
 
-  - `\"*\"` → latest published version overall.
+  - `\"*\"`, `\"latest\"`, `\"newest\"` → latest published version overall (case-insensitive).
   - `\"1.2.3\"` or `\"=1.2.3\"` → exactly version 1.2.3.
   - `\"1.2\"` or `\"^1.2\"` → latest 1.x ≥ 1.2 (caret).
   - `\"~1.2.3\"` → latest 1.2.x.

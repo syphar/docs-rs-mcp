@@ -48,10 +48,15 @@ impl<'de> serde::Deserialize<'de> for VersionReq {
         D: serde::Deserializer<'de>,
     {
         let raw = String::deserialize(deserializer)?;
-        let parsed = if semver::Version::parse(&raw).is_ok() {
-            semver::VersionReq::parse(&format!("={raw}"))
+        let trimmed = raw.trim();
+        // Friendly aliases for "latest published" — case-insensitive.
+        if trimmed.eq_ignore_ascii_case("latest") || trimmed.eq_ignore_ascii_case("newest") {
+            return Ok(Self(semver::VersionReq::STAR));
+        }
+        let parsed = if semver::Version::parse(trimmed).is_ok() {
+            semver::VersionReq::parse(&format!("={trimmed}"))
         } else {
-            semver::VersionReq::parse(&raw)
+            semver::VersionReq::parse(trimmed)
         };
         parsed.map(Self).map_err(serde::de::Error::custom)
     }
@@ -124,6 +129,18 @@ mod tests {
         // These aren't valid `Version`s, so the fallback parse runs unchanged.
         assert_eq!(parse("1.2").as_ref(), &semver::VersionReq::parse("1.2").unwrap());
         assert_eq!(parse("1").as_ref(), &semver::VersionReq::parse("1").unwrap());
+    }
+
+    #[test]
+    fn latest_and_newest_alias_to_star() {
+        assert_eq!(parse("latest").as_ref(), &semver::VersionReq::STAR);
+        assert_eq!(parse("newest").as_ref(), &semver::VersionReq::STAR);
+        // Case-insensitive.
+        assert_eq!(parse("Latest").as_ref(), &semver::VersionReq::STAR);
+        assert_eq!(parse("LATEST").as_ref(), &semver::VersionReq::STAR);
+        assert_eq!(parse("Newest").as_ref(), &semver::VersionReq::STAR);
+        // Whitespace tolerated.
+        assert_eq!(parse(" latest ").as_ref(), &semver::VersionReq::STAR);
     }
 
     #[test]
