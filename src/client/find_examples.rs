@@ -4,6 +4,7 @@ use crate::{
 };
 use anyhow::Result;
 use serde::Serialize;
+use tokio::fs;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Example {
@@ -55,7 +56,7 @@ pub(crate) async fn find_examples(
         let Some(name) = product.name else { continue };
         let abs_path = source_dir.join(&rel_path);
         let content = if include_content {
-            Some(tokio::fs::read_to_string(&abs_path).await?)
+            Some(fs::read_to_string(&abs_path).await?)
         } else {
             None
         };

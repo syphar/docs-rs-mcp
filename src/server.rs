@@ -49,10 +49,14 @@ ALWAYS call this first whenever the user gives anything other than a fully-speci
 version string. In particular, `\"*\"`, `\"0.8\"`, `\"^1.0\"`, `\"~1.2\"`, `\">=1.0, <2\"` are \
 NOT valid `version` arguments anywhere else; pass them as `req` here first.
 
-The `req` argument is a Cargo-style semver requirement:
+The `req` argument is a semver requirement. Note: this server diverges from \
+Cargo on one specific case — a bare *fully-qualified* `MAJOR.MINOR.PATCH` is \
+treated as an EXACT match (matching docs.rs URL semantics), not Cargo's caret \
+default. Everything else is parsed as a normal Cargo requirement.
+
   - `\"*\"` → latest published version overall.
-  - `\"=1.2.3\"` → exactly that version.
-  - `\"1.2\"` or `\"^1.2\"` → latest 1.x ≥ 1.2 (caret semantics).
+  - `\"1.2.3\"` or `\"=1.2.3\"` → exactly version 1.2.3.
+  - `\"1.2\"` or `\"^1.2\"` → latest 1.x ≥ 1.2 (caret).
   - `\"~1.2.3\"` → latest 1.2.x.
   - `\">=1.0, <2\"` → latest version in that range.
 

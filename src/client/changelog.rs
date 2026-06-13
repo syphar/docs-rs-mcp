@@ -1,6 +1,7 @@
 use crate::{client::get_source::fetch_source, context::Context};
 use anyhow::Result;
 use serde::Serialize;
+use tokio::fs;
 
 #[derive(Debug, Serialize)]
 pub(crate) struct Changelog {
@@ -38,7 +39,7 @@ pub(crate) async fn changelog(
     let mut changelog = None;
     for candidate in CANDIDATES {
         let candidate = source_dir.join(candidate);
-        if candidate.exists() {
+        if fs::try_exists(&candidate).await? {
             changelog = Some(candidate);
             break;
         }
@@ -48,7 +49,7 @@ pub(crate) async fn changelog(
         return Ok(None);
     };
 
-    let bytes = tokio::fs::read(&changelog).await?;
+    let bytes = fs::read(&changelog).await?;
 
     let text = String::from_utf8_lossy(&bytes).into_owned();
     let content = match section_version {
