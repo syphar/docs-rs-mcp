@@ -38,9 +38,7 @@ pub(crate) struct CrateMetadata {
 /// it out of the borrowed manifest. Inherited values reference a workspace's
 /// Cargo.toml which we don't fetch; treat them as absent for this tool.
 fn local<T: Clone>(mi: &Option<MaybeInherited<T>>) -> Option<T> {
-    mi.as_ref()
-        .and_then(|m| m.as_ref().as_local())
-        .cloned()
+    mi.as_ref().and_then(|m| m.as_ref().as_local()).cloned()
 }
 
 pub(crate) async fn crate_metadata(

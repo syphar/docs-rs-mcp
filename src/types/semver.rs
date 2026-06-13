@@ -109,7 +109,10 @@ mod tests {
     #[test_case("1.2.3-alpha.1", "=1.2.3-alpha.1"; "pre-release")]
     #[test_case("1.2.3+meta",    "=1.2.3+meta"   ; "build metadata")]
     fn bare_full_version_becomes_exact(input: &str, expected: &str) {
-        assert_eq!(parse(input).as_ref(), &semver::VersionReq::parse(expected).unwrap());
+        assert_eq!(
+            parse(input).as_ref(),
+            &semver::VersionReq::parse(expected).unwrap()
+        );
     }
 
     // Partial versions and explicit Cargo-style requirements are parsed unchanged.
@@ -120,7 +123,10 @@ mod tests {
     #[test_case("~1.2",       "~1.2"      ; "tilde")]
     #[test_case(">=1.0, <2",  ">=1.0, <2" ; "range")]
     fn cargo_style_requirements_pass_through(input: &str, expected: &str) {
-        assert_eq!(parse(input).as_ref(), &semver::VersionReq::parse(expected).unwrap());
+        assert_eq!(
+            parse(input).as_ref(),
+            &semver::VersionReq::parse(expected).unwrap()
+        );
     }
 
     // `*`, `latest`, `newest` (case-insensitive, whitespace-tolerant) → STAR.

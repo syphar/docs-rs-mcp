@@ -37,8 +37,7 @@ impl DocsServer {
         }
     }
 
-    #[tool(
-        description = "\
+    #[tool(description = "\
 Answer questions like *\"what's the latest version of X?\"* / *\"latest 0.8.x of axum\"* / \
 *\"what 1.0-compatible version is out?\"* / *\"does docs.rs have version Y of X?\"* / \
 *\"is X published?\"*. Resolves a crate name + a semver requirement to a *concrete* published \
@@ -61,8 +60,7 @@ default. Everything else is parsed as a normal Cargo requirement.
   - `\">=1.0, <2\"` → latest version in that range.
 
 Result is `{ version, doc_status }`. `doc_status = true` means docs.rs has built rustdoc JSON for \
-that release — required for `search_items`, `list_module`, `get_item`, etc."
-    )]
+that release — required for `search_items`, `list_module`, `get_item`, etc.")]
     async fn resolve_version(
         &self,
         Parameters(args): Parameters<ResolveVersionArgs>,

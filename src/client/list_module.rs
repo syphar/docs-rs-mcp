@@ -35,10 +35,7 @@ pub(crate) struct Listing {
 /// List direct children of a module. Returns `None` when no module exists
 /// at `path` (or when `path = Some(...)` doesn't resolve to a module).
 /// `path = None` lists the crate root.
-pub(crate) fn list_module(
-    docs: &rustdoc_types::Crate,
-    path: Option<&[String]>,
-) -> Option<Listing> {
+pub(crate) fn list_module(docs: &rustdoc_types::Crate, path: Option<&[String]>) -> Option<Listing> {
     let (module_id, module_path_str) = resolve_module(docs, path)?;
     let item = docs.index.get(&module_id)?;
     let ItemEnum::Module(m) = &item.inner else {
@@ -63,10 +60,7 @@ pub(crate) fn list_module(
     })
 }
 
-fn resolve_module(
-    docs: &rustdoc_types::Crate,
-    path: Option<&[String]>,
-) -> Option<(Id, String)> {
+fn resolve_module(docs: &rustdoc_types::Crate, path: Option<&[String]>) -> Option<(Id, String)> {
     match path {
         None => {
             let summary = docs.paths.get(&docs.root)?;
@@ -79,10 +73,7 @@ fn resolve_module(
     }
 }
 
-fn entry_from_child(
-    docs: &rustdoc_types::Crate,
-    child: &rustdoc_types::Item,
-) -> Option<Entry> {
+fn entry_from_child(docs: &rustdoc_types::Crate, child: &rustdoc_types::Item) -> Option<Entry> {
     match &child.inner {
         ItemEnum::Use(u) => {
             // Globs are reported separately via `unexpanded_external_globs`
