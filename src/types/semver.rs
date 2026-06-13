@@ -97,61 +97,41 @@ impl From<semver::VersionReq> for VersionReq {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_case::test_case;
 
     fn parse(s: &str) -> VersionReq {
         serde_json::from_str(&format!("\"{s}\"")).unwrap()
     }
 
-    #[test]
-    fn bare_full_version_becomes_exact() {
-        // Diverges from Cargo: "1.2.3" → "=1.2.3", not "^1.2.3".
-        assert_eq!(parse("1.2.3").as_ref(), &semver::VersionReq::parse("=1.2.3").unwrap());
-        assert_eq!(
-            parse("0.8.9").as_ref(),
-            &semver::VersionReq::parse("=0.8.9").unwrap(),
-        );
+    // Diverges from Cargo: bare `MAJOR.MINOR.PATCH[-pre][+build]` → exact match.
+    #[test_case("1.2.3",         "=1.2.3"        ; "bare triplet")]
+    #[test_case("0.8.9",         "=0.8.9"        ; "the case that bit us")]
+    #[test_case("1.2.3-alpha.1", "=1.2.3-alpha.1"; "pre-release")]
+    #[test_case("1.2.3+meta",    "=1.2.3+meta"   ; "build metadata")]
+    fn bare_full_version_becomes_exact(input: &str, expected: &str) {
+        assert_eq!(parse(input).as_ref(), &semver::VersionReq::parse(expected).unwrap());
     }
 
-    #[test]
-    fn pre_release_and_build_metadata_also_exact() {
-        assert_eq!(
-            parse("1.2.3-alpha.1").as_ref(),
-            &semver::VersionReq::parse("=1.2.3-alpha.1").unwrap(),
-        );
-        assert_eq!(
-            parse("1.2.3+meta").as_ref(),
-            &semver::VersionReq::parse("=1.2.3+meta").unwrap(),
-        );
+    // Partial versions and explicit Cargo-style requirements are parsed unchanged.
+    #[test_case("1.2",        "1.2"       ; "partial minor")]
+    #[test_case("1",          "1"         ; "partial major")]
+    #[test_case("^1.2.3",     "^1.2.3"    ; "caret")]
+    #[test_case("=1.2.3",     "=1.2.3"    ; "explicit equals")]
+    #[test_case("~1.2",       "~1.2"      ; "tilde")]
+    #[test_case(">=1.0, <2",  ">=1.0, <2" ; "range")]
+    fn cargo_style_requirements_pass_through(input: &str, expected: &str) {
+        assert_eq!(parse(input).as_ref(), &semver::VersionReq::parse(expected).unwrap());
     }
 
-    #[test]
-    fn partial_versions_stay_as_caret_requirements() {
-        // These aren't valid `Version`s, so the fallback parse runs unchanged.
-        assert_eq!(parse("1.2").as_ref(), &semver::VersionReq::parse("1.2").unwrap());
-        assert_eq!(parse("1").as_ref(), &semver::VersionReq::parse("1").unwrap());
-    }
-
-    #[test]
-    fn latest_and_newest_alias_to_star() {
-        assert_eq!(parse("latest").as_ref(), &semver::VersionReq::STAR);
-        assert_eq!(parse("newest").as_ref(), &semver::VersionReq::STAR);
-        // Case-insensitive.
-        assert_eq!(parse("Latest").as_ref(), &semver::VersionReq::STAR);
-        assert_eq!(parse("LATEST").as_ref(), &semver::VersionReq::STAR);
-        assert_eq!(parse("Newest").as_ref(), &semver::VersionReq::STAR);
-        // Whitespace tolerated.
-        assert_eq!(parse(" latest ").as_ref(), &semver::VersionReq::STAR);
-    }
-
-    #[test]
-    fn explicit_requirements_pass_through() {
-        assert_eq!(parse("^1.2.3").as_ref(), &semver::VersionReq::parse("^1.2.3").unwrap());
-        assert_eq!(parse("=1.2.3").as_ref(), &semver::VersionReq::parse("=1.2.3").unwrap());
-        assert_eq!(parse("~1.2").as_ref(), &semver::VersionReq::parse("~1.2").unwrap());
-        assert_eq!(
-            parse(">=1.0, <2").as_ref(),
-            &semver::VersionReq::parse(">=1.0, <2").unwrap(),
-        );
-        assert_eq!(parse("*").as_ref(), &semver::VersionReq::STAR);
+    // `*`, `latest`, `newest` (case-insensitive, whitespace-tolerant) → STAR.
+    #[test_case("*"        ; "star")]
+    #[test_case("latest"   ; "latest lowercase")]
+    #[test_case("Latest"   ; "latest mixed case")]
+    #[test_case("LATEST"   ; "latest uppercase")]
+    #[test_case("newest"   ; "newest lowercase")]
+    #[test_case("Newest"   ; "newest mixed case")]
+    #[test_case(" latest " ; "whitespace padded")]
+    fn aliases_for_latest_resolve_to_star(input: &str) {
+        assert_eq!(parse(input).as_ref(), &semver::VersionReq::STAR);
     }
 }

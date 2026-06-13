@@ -1,7 +1,6 @@
-use std::sync::Arc;
-
 use crate::{client::status::get_docs_status, context::Context, types::semver::VersionReq};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
+use std::sync::Arc;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub(crate) struct ResolveVersionArgs {
