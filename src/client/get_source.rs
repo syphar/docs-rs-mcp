@@ -93,7 +93,7 @@ pub(crate) async fn parse_cargo_manifest(
     source_dir: impl AsRef<Path>,
 ) -> Result<Option<cargo_manifest::Manifest>> {
     let cargo_toml = source_dir.as_ref().join("Cargo.toml");
-    if !cargo_toml.exists() {
+    if !tokio::fs::try_exists(&cargo_toml).await? {
         return Ok(None);
     }
 
