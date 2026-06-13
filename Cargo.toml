@@ -1,6 +1,49 @@
 [package]
 name = "docs-rs-mcp"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2024"
+authors = ["Denis Cornehl <denis@cornehl.org>"]
+description = "MCP server exposing Rust crate documentation from docs.rs and crates.io to AI assistants."
+repository = "https://github.com/rust-lang/docs-rs-mcp"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["mcp", "docs-rs", "rustdoc", "documentation", "ai"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
+anyhow = "1.0.102"
+axum = { version = "0.8.9", features = ["macros"] }
+cargo-manifest = "0.21.0"
+directories = "6.0.0"
+flate2 = "1.1.9"
+futures-util = "0.3"
+gethostname = "1.1.0"
+moka = { version = "0.12.15", features = ["future"] }
+reqwest = { version = "0.13", features = ["stream"] }
+rmcp = { version = "1.7.0", features = [
+    "auth",
+    "client",
+    "elicitation",
+    "macros",
+    "schemars",
+    "server",
+    "transport-io",
+    "transport-streamable-http-server",
+] }
+rustdoc-types = "0.57.3"
+semver = { version = "1.0.28", features = ["serde"] }
+serde = "1.0.228"
+serde_json = "1.0.150"
+tar = "0.4.46"
+tokio = { version = "1.52.3", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+zstd = "0.13.3"
+
+[dev-dependencies]
+mockito = "1.7.2"
+pretty_assertions = "1.4.1"
+tempfile = "3.27.0"
+test-case = "3.3.1"
