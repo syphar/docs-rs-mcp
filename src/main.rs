@@ -59,7 +59,6 @@ fn init_tracing(config: &Config) -> Result<()> {
     let pid = std::process::id();
     let file_appender = rolling::Builder::new()
         .rotation(rolling::Rotation::DAILY)
-        .latest_symlink(format!("{APP_NAME}.log"))
         .filename_prefix(format!("{APP_NAME}.{pid}"))
         .filename_suffix("log")
         .max_log_files(10)
