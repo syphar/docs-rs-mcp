@@ -9,6 +9,10 @@ Built so an LLM coding assistant can answer questions like *"what's the
 latest version of axum?"*, *"what methods does `Router` have?"*, *"how do I
 enable websockets?"* without burning tokens scraping HTML docs.
 
+This is more or less an experiment I'm using locally to see if it gives me
+real advantages with agentic coding. If it works out, we can think about
+hosting an extended version of it.
+
 ## What it gives you
 
 Twelve tools, all answering specific natural-language questions:
