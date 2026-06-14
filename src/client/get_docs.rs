@@ -77,7 +77,7 @@ pub(crate) async fn get_docs(
         target: target.map(|t| t.to_string()),
     };
 
-    let docs = context
+    Ok(context
         .rustdoc_json_cache
         .entry(key)
         .or_try_insert_with::<_, anyhow::Error>(async move {
@@ -96,9 +96,7 @@ pub(crate) async fn get_docs(
         })
         .await
         .map_err(|err| anyhow!(err))?
-        .into_value();
-
-    Ok(docs)
+        .into_value())
 }
 
 pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {

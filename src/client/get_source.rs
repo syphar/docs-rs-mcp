@@ -11,7 +11,7 @@ use std::{
 };
 use tar::Archive;
 use tokio::{fs, task::spawn_blocking};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 /// build a crate source download url.
 pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
@@ -49,10 +49,17 @@ pub(crate) async fn fetch_crate(
     Ok(Some(target_path))
 }
 
+#[instrument(skip(path), fields(path=%path.as_ref().display()))]
 async fn extract_source(path: impl AsRef<Path>, name: &str, version: &str) -> Result<PathBuf> {
     let path = path.as_ref().to_path_buf();
     let output_dir = path.parent().unwrap().join("extracted");
     let source_path = output_dir.join(format!("{name}-{version}"));
+
+    if source_path.is_dir() {
+        return Ok(source_path);
+    }
+
+    debug!("unpacking crate archive");
 
     spawn_blocking(move || -> Result<PathBuf> {
         std::fs::create_dir_all(&output_dir)?;
