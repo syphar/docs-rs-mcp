@@ -154,3 +154,74 @@ impl ServerHandler for DocsServer {
             .with_instructions(include_str!("../instructions/server.md").to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_descriptions_match_instruction_files() {
+        let tools = DocsServer::tool_router().list_all();
+        let expected = [
+            (
+                "changelog",
+                include_str!("../instructions/tools/changelog.md"),
+            ),
+            (
+                "crate_metadata",
+                include_str!("../instructions/tools/crate_metadata.md"),
+            ),
+            (
+                "dependency_tree",
+                include_str!("../instructions/tools/dependency_tree.md"),
+            ),
+            (
+                "find_examples",
+                include_str!("../instructions/tools/find_examples.md"),
+            ),
+            (
+                "get_item",
+                include_str!("../instructions/tools/get_item.md"),
+            ),
+            (
+                "inspect_feature_flags",
+                include_str!("../instructions/tools/inspect_feature_flags.md"),
+            ),
+            (
+                "list_implementors",
+                include_str!("../instructions/tools/list_implementors.md"),
+            ),
+            (
+                "list_impls",
+                include_str!("../instructions/tools/list_impls.md"),
+            ),
+            (
+                "list_methods",
+                include_str!("../instructions/tools/list_methods.md"),
+            ),
+            (
+                "list_module",
+                include_str!("../instructions/tools/list_module.md"),
+            ),
+            (
+                "resolve_version",
+                include_str!("../instructions/tools/resolve_version.md"),
+            ),
+            (
+                "search_items",
+                include_str!("../instructions/tools/search_items.md"),
+            ),
+        ];
+
+        assert_eq!(tools.len(), expected.len());
+
+        for (name, description) in expected {
+            let tool = tools
+                .iter()
+                .find(|tool| tool.name.as_ref() == name)
+                .unwrap_or_else(|| panic!("missing tool {name}"));
+
+            assert_eq!(tool.description.as_deref(), Some(description), "{name}");
+        }
+    }
+}
