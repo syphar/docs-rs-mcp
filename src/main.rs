@@ -4,11 +4,6 @@ use crate::{
 };
 use anyhow::Result;
 use rmcp::{ServiceExt, transport::stdio};
-use std::{
-    io,
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
 use tracing::{Instrument as _, error, info, info_span, level_filters::LevelFilter};
 use tracing_appender::rolling;
 use tracing_subscriber::{
@@ -28,22 +23,6 @@ mod types;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const ENV_NAME: &str = "DOCS_RS_MCP_LOG";
-
-/// Forces a `flush()` after every `write()`. We use it on the file layer so
-/// abrupt SIGKILL (e.g. from MCP clients tearing down the stdio child) doesn't
-/// strand log bytes in `RollingFileAppender`'s internal `BufWriter`.
-struct FlushOnWrite<W: io::Write>(W);
-
-impl<W: io::Write> io::Write for FlushOnWrite<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = self.0.write(buf)?;
-        self.0.flush()?;
-        Ok(n)
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        self.0.flush()
-    }
-}
 
 /// Initialize tracing with two sinks:
 ///   - stderr (compact, WARN+ by default) — for visibility during dev.
@@ -75,15 +54,10 @@ fn init_tracing(config: &Config) -> Result<()> {
                 .from_env_lossy(),
         );
 
-    // Wrap in Mutex<FlushOnWrite<_>> so `MakeWriter` is satisfied and every
-    // event hits disk before write() returns. RollingFileAppender's own
-    // rollover logic still runs inside its Write impl.
-    let file_writer = Mutex::new(FlushOnWrite(file_appender));
-
     let file_layer = fmt::layer()
         .json()
         .with_ansi(false)
-        .with_writer(file_writer)
+        .with_writer(file_appender)
         // Emit one JSON line per span close, carrying `time.busy` /
         // `time.idle` durations. Combined with `#[tracing::instrument]` on
         // tool handlers, this gives you per-call timing data in the log.
@@ -103,55 +77,19 @@ fn init_tracing(config: &Config) -> Result<()> {
     Ok(())
 }
 
-/// Walk up from `start` looking for the nearest `Cargo.toml`. Returns the
-/// directory it sits in.
-fn find_project_root(start: &Path) -> Option<PathBuf> {
-    start
-        .ancestors()
-        .find(|p| p.join("Cargo.toml").exists())
-        .map(Path::to_path_buf)
-}
-
-/// Parse the nearest `Cargo.toml` for the package name. Falls through to
-/// `None` for workspace-only manifests (no `[package]`) or parse failures.
-fn project_name(start: &Path) -> Option<String> {
-    let root = find_project_root(start)?;
-    let manifest = cargo_manifest::Manifest::from_path(root.join("Cargo.toml")).ok()?;
-    manifest.package.map(|p| p.name)
-}
-
-/// Emit one INFO event with everything that's static for this process —
-/// the AI/operator reading the log later can pin a session to its host,
-/// project, MCP version, and host target without grepping.
-fn log_instance_banner() {
-    let cwd = std::env::current_dir().ok();
-    let cwd_str = cwd.as_ref().map(|p| p.display().to_string());
-    let project_root = cwd.as_ref().and_then(|c| find_project_root(c));
-    let project_root_str = project_root.as_ref().map(|p| p.display().to_string());
-    let project = cwd.as_ref().and_then(|c| project_name(c));
-    let hostname = gethostname::gethostname().to_string_lossy().into_owned();
-    let user = std::env::var("USER")
-        .or_else(|_| std::env::var("USERNAME"))
-        .ok();
-
-    info!(
-        pid = std::process::id(),
-        cwd = cwd_str.as_deref(),
-        project = project.as_deref(),
-        project_root = project_root_str.as_deref(),
-        hostname = %hostname,
-        user = user.as_deref(),
-        build_target = env!("BUILD_TARGET"),
-        mcp_version = env!("CARGO_PKG_VERSION"),
-        "instance started"
-    );
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let config = Config::from_env()?;
     init_tracing(&config)?;
-    log_instance_banner();
+
+    info!(
+        cwd = std::env::current_dir()
+            .map(|cwd| cwd.display().to_string())
+            .ok(),
+        mcp_version = env!("CARGO_PKG_VERSION"),
+        "instance started"
+    );
+
     info!(log_dir = %config.log_dir.display(), "tracing initialized");
 
     let context = Context::new(config);
