@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Context};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context, errors::Error};
 use anyhow::Result;
 use cargo_manifest::{Dependency as ManifestDep, DepsSet};
 use serde::Serialize;
@@ -43,11 +43,8 @@ pub(crate) async fn dependency_tree(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<Vec<Dependency>>> {
-    let arc = fetch_cargo_manifest(context, krate, version).await?;
-    let Some(manifest) = arc.as_ref() else {
-        return Ok(None);
-    };
+) -> Result<Vec<Dependency>, Error> {
+    let manifest = fetch_cargo_manifest(context, krate, version).await?;
 
     let mut out = Vec::new();
     collect_section(
@@ -97,7 +94,7 @@ pub(crate) async fn dependency_tree(
             .cmp(&b.name)
             .then_with(|| format!("{:?}", a.kind).cmp(&format!("{:?}", b.kind)))
     });
-    Ok(Some(out))
+    Ok(out)
 }
 
 fn collect_section(
@@ -158,9 +155,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let deps = dependency_tree(env.context(), "axum", &version)
-            .await?
-            .expect("deps present");
+        let deps = dependency_tree(env.context(), "axum", &version).await?;
 
         let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
         assert!(names.iter().any(|n| n.contains("axum-core")));

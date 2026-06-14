@@ -1,4 +1,6 @@
-use crate::{client::inspect_feature_flags, context::Context, types::semver::Version};
+use crate::{
+    client::inspect_feature_flags, context::Context, tools::render_response, types::semver::Version,
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
@@ -27,14 +29,7 @@ pub(crate) async fn handle(
 ) -> Result<CallToolResult, McpError> {
     let features =
         inspect_feature_flags::inspect_feature_flags(context, &args.krate, args.version.as_ref())
-            .await
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?
-            .ok_or_else(|| {
-                McpError::resource_not_found("crate or version not found on crates.io", None)
-            })?;
+            .await?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(InspectFeatureFlagsResult { features })
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(InspectFeatureFlagsResult { features })
 }

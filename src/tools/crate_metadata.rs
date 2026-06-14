@@ -1,4 +1,6 @@
-use crate::{client::crate_metadata, context::Context, types::semver::Version};
+use crate::{
+    client::crate_metadata, context::Context, tools::render_response, types::semver::Version,
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -19,15 +21,7 @@ pub(crate) async fn handle(
     context: &Context,
     args: CrateMetadataArgs,
 ) -> Result<CallToolResult, McpError> {
-    let meta = crate_metadata::crate_metadata(context, &args.krate, args.version.as_ref())
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on crates.io", None)
-        })?;
+    let meta = crate_metadata::crate_metadata(context, &args.krate, args.version.as_ref()).await?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(meta)
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(meta)
 }

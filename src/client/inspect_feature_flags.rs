@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Context};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context, errors::Error};
 use anyhow::Result;
 use serde::Serialize;
 
@@ -18,13 +18,10 @@ pub(crate) async fn inspect_feature_flags(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<Vec<Feature>>> {
-    let arc = fetch_cargo_manifest(context, krate, version).await?;
-    let Some(manifest) = arc.as_ref() else {
-        return Ok(None);
-    };
+) -> Result<Vec<Feature>, Error> {
+    let manifest = fetch_cargo_manifest(context, krate, version).await?;
     let Some(mut features) = manifest.features.clone() else {
-        return Ok(Some(Vec::new()));
+        return Ok(Vec::new());
     };
 
     let defaults: Vec<String> = features.remove("default").unwrap_or_default();
@@ -48,7 +45,7 @@ pub(crate) async fn inspect_feature_flags(
         });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(Some(out))
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -68,9 +65,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let features = inspect_feature_flags(env.context(), "axum", &version)
-            .await?
-            .expect("features present");
+        let features = inspect_feature_flags(env.context(), "axum", &version).await?;
 
         let names: Vec<&str> = features.iter().map(|f| f.name.as_str()).collect();
         assert!(names.contains(&"default"));

@@ -1,3 +1,6 @@
+use rmcp::{ErrorData as McpError, model::CallToolResult};
+use serde::Serialize;
+
 pub(crate) mod changelog;
 pub(crate) mod crate_metadata;
 pub(crate) mod dependency_tree;
@@ -11,3 +14,10 @@ pub(crate) mod list_module;
 pub(crate) mod readme;
 pub(crate) mod resolve_version;
 pub(crate) mod search_items;
+
+pub(crate) fn render_response<T: Serialize>(response: T) -> Result<CallToolResult, McpError> {
+    Ok(CallToolResult::structured(
+        serde_json::to_value(response)
+            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
+    ))
+}

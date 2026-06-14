@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_source, context::Context};
+use crate::{client::get_source::fetch_source, context::Context, errors::Error};
 use anyhow::{Context as _, Result};
 use serde::Serialize;
 use tokio::fs;
@@ -38,10 +38,8 @@ pub(crate) async fn changelog(
     krate: &str,
     version: &semver::Version,
     section_version: Option<&str>,
-) -> Result<Option<Changelog>> {
-    let Some(source_dir) = fetch_source(context, krate, version).await? else {
-        return Ok(None);
-    };
+) -> Result<Changelog, Error> {
+    let source_dir = fetch_source(context, krate, version).await?;
 
     let mut filename = None;
     for candidate in CANDIDATES {
@@ -53,7 +51,7 @@ pub(crate) async fn changelog(
     }
 
     let Some(filename) = filename else {
-        return Ok(None);
+        return Err(Error::MissingSourceFile(CANDIDATES.join(",")));
     };
 
     let bytes = fs::read(&filename).await?;
@@ -63,14 +61,17 @@ pub(crate) async fn changelog(
 
     let filtered: Vec<_> = if let Some(section_version) = section_version {
         let Some(release) = entries.get(section_version) else {
-            return Ok(None);
+            return Err(Error::ResourceNotFound(format!(
+                "version {} in changelog",
+                section_version
+            )));
         };
         vec![release]
     } else {
         entries.values().collect::<Vec<_>>()
     };
 
-    Ok(Some(Changelog {
+    Ok(Changelog {
         source_file: filename.display().to_string(),
         releases: filtered
             .into_iter()
@@ -80,7 +81,7 @@ pub(crate) async fn changelog(
                 notes: cl.notes.to_string(),
             })
             .collect(),
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -100,9 +101,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let cl = changelog(env.context(), "axum", &version, None)
-            .await?
-            .expect("changelog present");
+        let cl = changelog(env.context(), "axum", &version, None).await?;
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));
 
         assert_eq!(cl.releases.len(), 90);
@@ -126,9 +125,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let cl = changelog(env.context(), "axum", &version, Some("0.8.8"))
-            .await?
-            .expect("changelog present");
+        let cl = changelog(env.context(), "axum", &version, Some("0.8.8")).await?;
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));
 
         assert_eq!(cl.releases.len(), 1);
@@ -150,11 +147,12 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        assert!(
+        assert!(matches!(
             changelog(env.context(), "axum", &version, Some("9.9.9"))
-                .await?
-                .is_none()
-        );
+                .await
+                .unwrap_err(),
+            Error::ResourceNotFound(_)
+        ));
 
         Ok(())
     }

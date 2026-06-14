@@ -14,6 +14,7 @@ pub(crate) mod readme;
 pub(crate) mod search_items;
 pub(crate) mod status;
 
+use crate::errors::Error;
 use anyhow::Result;
 use futures_util::TryStreamExt as _;
 use reqwest::{StatusCode, Url};
@@ -50,11 +51,10 @@ fn dir_for_crate(output_path: &Path, name: &str, version: &str) -> PathBuf {
     path
 }
 
-/// `Ok(true)` on success, `Ok(false)` on 404. Other HTTP errors propagate.
-async fn download(url: Url, target_path: &Path) -> Result<bool> {
-    let response = CLIENT.get(url).send().await?;
+async fn download(url: Url, target_path: &Path) -> Result<(), Error> {
+    let response = CLIENT.get(url.clone()).send().await?;
     if response.status() == StatusCode::NOT_FOUND {
-        return Ok(false);
+        return Err(Error::VersionNotFound(url));
     }
     let response = response.error_for_status()?;
 
@@ -66,5 +66,5 @@ async fn download(url: Url, target_path: &Path) -> Result<bool> {
     tokio::io::copy(&mut reader, &mut file).await?;
     file.flush().await?;
 
-    Ok(true)
+    Ok(())
 }

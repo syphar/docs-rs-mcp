@@ -1,4 +1,4 @@
-use crate::{client::readme, context::Context, types::semver::Version};
+use crate::{client::readme, context::Context, tools::render_response, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -26,8 +26,5 @@ pub(crate) async fn handle(
             McpError::resource_not_found("no README file found in this crate's source", None)
         })?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(readme)
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(readme)
 }

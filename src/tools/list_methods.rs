@@ -1,6 +1,7 @@
 use crate::{
     client::{get_docs::get_docs, list_methods},
     context::Context,
+    tools::render_response,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -46,20 +47,12 @@ pub(crate) async fn handle(
     args: ListMethodsArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
-    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target))
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on docs.rs", None)
-        })?;
+    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target)).await?;
 
     let path: Vec<&str> = args.type_path.split("::").collect();
 
     let methods = list_methods::list_methods(&docs, &path)
         .ok_or_else(|| McpError::resource_not_found("type not found at the given path", None))?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(ListMethodsResult { methods })
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(ListMethodsResult { methods })
 }

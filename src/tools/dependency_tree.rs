@@ -1,4 +1,6 @@
-use crate::{client::dependency_tree, context::Context, types::semver::Version};
+use crate::{
+    client::dependency_tree, context::Context, tools::render_response, types::semver::Version,
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
@@ -26,15 +28,7 @@ pub(crate) async fn handle(
     args: DependencyTreeArgs,
 ) -> Result<CallToolResult, McpError> {
     let dependencies =
-        dependency_tree::dependency_tree(context, &args.krate, args.version.as_ref())
-            .await
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?
-            .ok_or_else(|| {
-                McpError::resource_not_found("crate or version not found on crates.io", None)
-            })?;
+        dependency_tree::dependency_tree(context, &args.krate, args.version.as_ref()).await?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(DependencyTreeResult { dependencies })
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(DependencyTreeResult { dependencies })
 }

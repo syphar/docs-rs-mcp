@@ -1,4 +1,6 @@
-use crate::{client::find_examples, context::Context, types::semver::Version};
+use crate::{
+    client::find_examples, context::Context, tools::render_response, types::semver::Version,
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
@@ -39,12 +41,7 @@ pub(crate) async fn handle(
         args.version.as_ref(),
         args.include_content,
     )
-    .await
-    .map_err(|err| McpError::internal_error(err.to_string(), None))?
-    .ok_or_else(|| McpError::resource_not_found("crate or version not found on crates.io", None))?;
+    .await?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(FindExamplesResult { examples })
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(FindExamplesResult { examples })
 }

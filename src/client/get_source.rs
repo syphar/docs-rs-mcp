@@ -1,8 +1,9 @@
 use crate::{
     client::{dir_for_crate, download},
     context::{Context, DocsKey},
+    errors::Error,
 };
-use anyhow::{Context as _, Result, anyhow, bail};
+use anyhow::{Context as _, Result, bail};
 use flate2::read::GzDecoder;
 use std::{
     fs::File,
@@ -22,7 +23,7 @@ pub(crate) async fn fetch_crate(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<PathBuf>> {
+) -> Result<PathBuf, Error> {
     let config = context.config();
     let version = version.to_string();
 
@@ -30,8 +31,8 @@ pub(crate) async fn fetch_crate(
     let target_path = target_dir.join("source").with_extension("crate");
 
     if fs::try_exists(&target_path).await? {
-        debug!(target_path = %target_path.display(), "found crate source");
-        return Ok(Some(target_path));
+        debug!(target_path = %target_path.display(), "found crate file");
+        return Ok(target_path);
     }
 
     fs::create_dir_all(&target_dir).await?;
@@ -42,11 +43,9 @@ pub(crate) async fn fetch_crate(
 
     debug!(%url, target_path=%target_path.display(), "downloading crate source");
 
-    if !download(url, &target_path).await? {
-        return Ok(None);
-    }
+    download(url, &target_path).await?;
 
-    Ok(Some(target_path))
+    Ok(target_path)
 }
 
 #[instrument(skip(path), fields(path=%path.as_ref().display()))]
@@ -85,28 +84,27 @@ pub(crate) async fn fetch_source(
     config: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<PathBuf>> {
-    let Some(crate_file) = fetch_crate(config, krate, version).await? else {
-        return Ok(None);
-    };
+) -> Result<PathBuf, Error> {
+    let crate_file = fetch_crate(config, krate, version).await?;
 
     let version_str = version.to_string();
     let source_dir = extract_source(&crate_file, krate, &version_str).await?;
 
-    Ok(Some(source_dir))
+    Ok(source_dir)
 }
 
 pub(crate) async fn parse_cargo_manifest(
     source_dir: impl AsRef<Path>,
-) -> Result<Option<cargo_manifest::Manifest>> {
-    let cargo_toml = source_dir.as_ref().join("Cargo.toml");
+) -> Result<cargo_manifest::Manifest, Error> {
+    const CARGO_TOML: &str = "Cargo.toml";
+    let cargo_toml = source_dir.as_ref().join(CARGO_TOML);
     if !tokio::fs::try_exists(&cargo_toml).await? {
-        return Ok(None);
+        return Err(Error::MissingSourceFile(CARGO_TOML.into()));
     }
 
     let bytes = tokio::fs::read(&cargo_toml).await?;
     let manifest = cargo_manifest::Manifest::from_slice(&bytes).context("parsing Cargo.toml")?;
-    Ok(Some(manifest))
+    Ok(manifest)
 }
 
 /// Convenience: fetch the crate archive (if needed), read `Cargo.toml`, and
@@ -117,7 +115,7 @@ pub(crate) async fn fetch_cargo_manifest(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Arc<Option<cargo_manifest::Manifest>>> {
+) -> Result<Arc<cargo_manifest::Manifest>, Error> {
     let key = DocsKey {
         name: krate.to_string(),
         version: version.to_owned(),
@@ -127,15 +125,12 @@ pub(crate) async fn fetch_cargo_manifest(
     let docs = context
         .cargo_manifest_cache
         .entry(key)
-        .or_try_insert_with::<_, anyhow::Error>(async move {
-            let Some(source_dir) = fetch_source(context, krate, version).await? else {
-                return Ok(Arc::new(None));
-            };
+        .or_try_insert_with::<_, Error>(async move {
+            let source_dir = fetch_source(context, krate, version).await?;
 
             Ok(Arc::new(parse_cargo_manifest(&source_dir).await?))
         })
-        .await
-        .map_err(|err| anyhow!(err))?
+        .await?
         .into_value();
 
     Ok(docs)
@@ -163,9 +158,7 @@ mod tests {
             .with_body_from_file(&fixure_path)
             .create();
 
-        let path = fetch_source(env.context(), "axum", &version)
-            .await?
-            .expect("expected crate source to be present");
+        let path = fetch_source(env.context(), "axum", &version).await?;
 
         assert!(path.exists());
 

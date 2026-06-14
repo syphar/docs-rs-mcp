@@ -4,6 +4,8 @@ use crate::{
         get_item::{self, Verbosity},
     },
     context::Context,
+    errors::Error,
+    tools::render_response,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -52,20 +54,12 @@ pub(crate) async fn handle(
     args: GetItemArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
-    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target))
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on docs.rs", None)
-        })?;
+    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target)).await?;
 
     let path: Vec<&str> = args.path.split("::").collect();
 
     let record = get_item::get_item(&docs, &path, args.verbosity)
-        .ok_or_else(|| McpError::resource_not_found("item not found at the given path", None))?;
+        .ok_or_else(|| Error::item_not_found(path))?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(record)
-            .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(record)
 }

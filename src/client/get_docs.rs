@@ -1,8 +1,9 @@
 use crate::{
     client::{dir_for_crate, download},
     context::{Context, DocsKey},
+    errors::Error,
 };
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Context as _, Result};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -27,7 +28,7 @@ async fn fetch_rustdoc_json(
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
-) -> Result<Option<PathBuf>> {
+) -> Result<PathBuf, Error> {
     let version = version.to_string();
 
     let target_dir = dir_for_crate(&context.config().cache_dir, krate, &version);
@@ -37,7 +38,7 @@ async fn fetch_rustdoc_json(
 
     if fs::try_exists(&target_path).await? {
         debug!(target_path = %target_path.display(), "found rustdoc json");
-        return Ok(Some(target_path));
+        return Ok(target_path);
     }
 
     fs::create_dir_all(&target_dir).await?;
@@ -49,11 +50,9 @@ async fn fetch_rustdoc_json(
 
     debug!(%url, target_path=%target_path.display(), "downloading rustdoc json");
 
-    if !download(url, &target_path).await? {
-        return Ok(None);
-    }
+    download(url, &target_path).await?;
 
-    Ok(Some(target_path))
+    Ok(target_path)
 }
 
 /// Fetch rustdoc JSON for `(krate, version, target)`. On a 404 for the
@@ -70,7 +69,7 @@ pub(crate) async fn get_docs(
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
-) -> Result<Option<Arc<rustdoc_types::Crate>>> {
+) -> Result<Arc<rustdoc_types::Crate>, Error> {
     let key = DocsKey {
         name: krate.to_string(),
         version: version.to_owned(),
@@ -80,22 +79,18 @@ pub(crate) async fn get_docs(
     Ok(context
         .rustdoc_json_cache
         .entry(key)
-        .or_try_insert_with::<_, anyhow::Error>(async move {
-            let path = match fetch_rustdoc_json(context, krate, version, target).await? {
-                Some(p) => p,
-                None if target.is_some() => {
-                    let Some(p) = fetch_rustdoc_json(context, krate, version, None).await? else {
-                        return Ok(None);
-                    };
-                    p
+        .or_try_insert_with::<_, Error>(async move {
+            let path = match fetch_rustdoc_json(context, krate, version, target).await {
+                Ok(p) => p,
+                Err(err) if matches!(err, Error::VersionNotFound(_)) && target.is_some() => {
+                    fetch_rustdoc_json(context, krate, version, None).await?
                 }
-                None => return Ok(None),
+                Err(err) => return Err(err),
             };
 
-            Ok(Some(Arc::new(parse_rustdoc_json(&path).await?)))
+            Ok(Arc::new(parse_rustdoc_json(&path).await?))
         })
-        .await
-        .map_err(|err| anyhow!(err))?
+        .await?
         .into_value())
 }
 
@@ -136,9 +131,7 @@ mod tests {
             .with_body_from_file(&fixure_path)
             .create();
 
-        let docs = get_docs(env.context(), "axum", &version, target)
-            .await?
-            .expect("expected docs to be present");
+        let docs = get_docs(env.context(), "axum", &version, target).await?;
         assert_eq!(docs.crate_version, Some(version.to_string()));
 
         let root = &docs.paths[&docs.root];

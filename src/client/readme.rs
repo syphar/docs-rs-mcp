@@ -4,10 +4,11 @@ use crate::{
         get_source::{fetch_source, parse_cargo_manifest},
     },
     context::Context,
+    errors::Error,
 };
 use anyhow::Result;
 use serde::Serialize;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 #[derive(Debug, Serialize)]
@@ -20,47 +21,37 @@ pub(crate) struct Readme {
 
 const DEFAULT_README_CANDIDATES: &[&str] = &["README.md", "README.txt", "README"];
 
-fn safe_readme_path(source_dir: &Path, readme_path: impl AsRef<Path>) -> Option<PathBuf> {
-    let readme_path = readme_path.as_ref();
-
-    if readme_path.is_absolute()
-        || readme_path
-            .components()
-            .any(|component| matches!(component, Component::ParentDir))
-    {
-        return None;
-    }
-
-    Some(source_dir.join(readme_path))
-}
-
-async fn default_readme(source_dir: &Path) -> Result<Option<PathBuf>> {
+async fn default_readme(source_dir: &Path) -> Result<PathBuf, Error> {
     for candidate in DEFAULT_README_CANDIDATES {
         let path = source_dir.join(candidate);
         if fs::try_exists(&path).await? {
-            return Ok(Some(path));
+            return Ok(path);
         }
     }
 
-    Ok(None)
+    Err(Error::MissingSourceFile(
+        DEFAULT_README_CANDIDATES.join(","),
+    ))
 }
 
-async fn manifest_readme(source_dir: &Path) -> Result<Option<PathBuf>> {
-    let Some(manifest) = parse_cargo_manifest(source_dir).await? else {
-        return default_readme(source_dir).await;
-    };
+async fn manifest_readme(source_dir: &Path) -> Result<PathBuf, Error> {
+    let manifest = parse_cargo_manifest(source_dir).await?;
     let Some(pkg) = manifest.package.as_ref() else {
         return default_readme(source_dir).await;
     };
 
     match local(&pkg.readme) {
         Some(cargo_manifest::StringOrBool::String(path)) => {
-            let Some(path) = safe_readme_path(source_dir, &path) else {
-                return Ok(None);
-            };
-            Ok(fs::try_exists(&path).await?.then_some(path))
+            let path = source_dir.join(path);
+            if fs::try_exists(&path).await? {
+                Ok(path)
+            } else {
+                Err(Error::MissingSourceFile("no readme in crate".to_string()))
+            }
         }
-        Some(cargo_manifest::StringOrBool::Bool(false)) => Ok(None),
+        Some(cargo_manifest::StringOrBool::Bool(false)) => Err(Error::MissingSourceFile(
+            "readme disabled in crate".to_string(),
+        )),
         Some(cargo_manifest::StringOrBool::Bool(true)) | None => default_readme(source_dir).await,
     }
 }
@@ -70,12 +61,8 @@ pub(crate) async fn readme(
     krate: &str,
     version: &semver::Version,
 ) -> Result<Option<Readme>> {
-    let Some(source_dir) = fetch_source(context, krate, version).await? else {
-        return Ok(None);
-    };
-    let Some(readme_path) = manifest_readme(&source_dir).await? else {
-        return Ok(None);
-    };
+    let source_dir = fetch_source(context, krate, version).await?;
+    let readme_path = manifest_readme(&source_dir).await?;
 
     let bytes = fs::read(&readme_path).await?;
     let content = String::from_utf8_lossy(&bytes).into_owned();
@@ -107,7 +94,7 @@ mod tests {
             .await?
             .expect("README present");
 
-        assert!(readme.source_file.ends_with("/README.md"));
+        assert!(readme.source_file.ends_with("README.md"));
         assert!(readme.content.contains("axum"));
         Ok(())
     }

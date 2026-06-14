@@ -1,6 +1,7 @@
 use crate::{
     client::{get_docs::get_docs, search_items},
     context::Context,
+    tools::render_response,
     types::{rustdoc_types::ItemKind, semver::Version},
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -90,21 +91,13 @@ pub(crate) async fn handle(
     args: SearchItemsArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
-    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target))
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on docs.rs", None)
-        })?;
+    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target)).await?;
 
     let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
     let unexpanded_external_globs = search_items::unexpanded_external_globs(&docs);
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(SearchItemsResult {
-            items,
-            unexpanded_external_globs,
-        })
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(SearchItemsResult {
+        items,
+        unexpanded_external_globs,
+    })
 }

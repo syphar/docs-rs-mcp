@@ -1,6 +1,7 @@
 use crate::{
     client::{get_docs::get_docs, list_module, search_items::UnexpandedExternalGlob},
     context::Context,
+    tools::render_response,
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
@@ -55,12 +56,7 @@ pub(crate) async fn handle(
     args: ListModuleArgs,
 ) -> Result<CallToolResult, McpError> {
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
-    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target))
-        .await
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .ok_or_else(|| {
-            McpError::resource_not_found("crate or version not found on docs.rs", None)
-        })?;
+    let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target)).await?;
 
     let path_vec: Option<Vec<String>> = args
         .path
@@ -70,11 +66,8 @@ pub(crate) async fn handle(
     let listing = list_module::list_module(&docs, path_vec.as_deref())
         .ok_or_else(|| McpError::resource_not_found("module not found at the given path", None))?;
 
-    Ok(CallToolResult::structured(
-        serde_json::to_value(ListModuleResult {
-            entries: listing.entries,
-            unexpanded_external_globs: listing.unexpanded_external_globs,
-        })
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
+    render_response(ListModuleResult {
+        entries: listing.entries,
+        unexpanded_external_globs: listing.unexpanded_external_globs,
+    })
 }

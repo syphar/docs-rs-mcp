@@ -1,4 +1,7 @@
-use crate::{client::status::get_docs_status, context::Context, types::semver::VersionReq};
+use crate::{
+    client::status::get_docs_status, context::Context, tools::render_response,
+    types::semver::VersionReq,
+};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use std::sync::Arc;
 
@@ -38,10 +41,7 @@ pub(crate) async fn handle(
         .into_value()
         .as_ref()
     {
-        Ok(CallToolResult::structured(
-            serde_json::to_value(status)
-                .map_err(|err| McpError::internal_error(err.to_string(), None))?,
-        ))
+        Ok(render_response(status)?)
     } else {
         Err(McpError::resource_not_found(
             "crate or version not found",

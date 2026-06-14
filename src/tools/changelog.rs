@@ -1,4 +1,4 @@
-use crate::{client::changelog, context::Context, types::semver::Version};
+use crate::{client::changelog, context::Context, tools::render_response, types::semver::Version};
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -28,19 +28,13 @@ pub(crate) async fn handle(
     context: &Context,
     args: ChangelogArgs,
 ) -> Result<CallToolResult, McpError> {
-    let cl = changelog::changelog(
-        context,
-        &args.krate,
-        args.version.as_ref(),
-        args.section_version.as_deref(),
+    render_response(
+        changelog::changelog(
+            context,
+            &args.krate,
+            args.version.as_ref(),
+            args.section_version.as_deref(),
+        )
+        .await?,
     )
-    .await
-    .map_err(|err| McpError::internal_error(err.to_string(), None))?
-    .ok_or_else(|| {
-        McpError::resource_not_found("no changelog file found in this crate's source", None)
-    })?;
-
-    Ok(CallToolResult::structured(
-        serde_json::to_value(cl).map_err(|err| McpError::internal_error(err.to_string(), None))?,
-    ))
 }

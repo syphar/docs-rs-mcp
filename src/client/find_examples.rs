@@ -1,6 +1,7 @@
 use crate::{
     client::get_source::{fetch_source, parse_cargo_manifest},
     context::Context,
+    errors::Error,
 };
 use anyhow::Result;
 use serde::Serialize;
@@ -32,20 +33,16 @@ pub(crate) async fn find_examples(
     krate: &str,
     version: &semver::Version,
     include_content: bool,
-) -> Result<Option<Vec<Example>>> {
-    let Some(source_dir) = fetch_source(context, krate, version).await? else {
-        return Ok(None);
-    };
+) -> Result<Vec<Example>, Error> {
+    let source_dir = fetch_source(context, krate, version).await?;
 
     // `from_path` calls `complete_from_path` under the hood — fills in
     // auto-discovered examples from `examples/*.rs`.
     // let manifest = cargo_manifest::Manifest::from_path(source_dir.join("Cargo.toml"))?;
-    let Some(manifest) = parse_cargo_manifest(&source_dir).await? else {
-        return Ok(None);
-    };
+    let manifest = parse_cargo_manifest(&source_dir).await?;
 
     if manifest.example.is_empty() {
-        return Ok(None);
+        return Ok(vec![]);
     }
 
     let mut examples = Vec::new();
@@ -68,7 +65,7 @@ pub(crate) async fn find_examples(
         });
     }
     examples.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(Some(examples))
+    Ok(examples)
 }
 
 #[cfg(test)]
@@ -93,7 +90,7 @@ mod tests {
         assert!(
             find_examples(env.context(), "axum", &version, false)
                 .await?
-                .is_none()
+                .is_empty()
         );
         Ok(())
     }
@@ -110,9 +107,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let examples = find_examples(env.context(), "itertools", &version, false)
-            .await?
-            .expect("should have examples");
+        let examples = find_examples(env.context(), "itertools", &version, false).await?;
 
         assert_eq!(examples.len(), 1);
         let iris = &examples[0];
@@ -125,9 +120,7 @@ mod tests {
         assert!(iris.content.is_none(), "content omitted by default");
 
         // With include_content=true, content is populated.
-        let with_content = find_examples(env.context(), "itertools", &version, true)
-            .await?
-            .expect("should have examples");
+        let with_content = find_examples(env.context(), "itertools", &version, true).await?;
         assert!(with_content[0].content.is_some());
 
         Ok(())

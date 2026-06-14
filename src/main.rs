@@ -15,6 +15,7 @@ use tracing_subscriber::{
 
 mod client;
 mod context;
+mod errors;
 mod server;
 #[cfg(test)]
 mod test_utils;

@@ -1,4 +1,4 @@
-use crate::{client::get_source::fetch_cargo_manifest, context::Context};
+use crate::{client::get_source::fetch_cargo_manifest, context::Context, errors::Error};
 use anyhow::Result;
 use cargo_manifest::MaybeInherited;
 use serde::Serialize;
@@ -45,13 +45,10 @@ pub(crate) async fn crate_metadata(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-) -> Result<Option<CrateMetadata>> {
-    let arc = fetch_cargo_manifest(context, krate, version).await?;
-    let Some(manifest) = arc.as_ref() else {
-        return Ok(None);
-    };
+) -> Result<CrateMetadata, Error> {
+    let manifest = fetch_cargo_manifest(context, krate, version).await?;
     let Some(pkg) = manifest.package.as_ref() else {
-        return Ok(None);
+        return Err(Error::MissingMetadata("missing package metadata".into()));
     };
 
     let readme = local(&pkg.readme).and_then(|s_or_b| match s_or_b {
@@ -59,7 +56,7 @@ pub(crate) async fn crate_metadata(
         cargo_manifest::StringOrBool::Bool(_) => None,
     });
 
-    Ok(Some(CrateMetadata {
+    Ok(CrateMetadata {
         name: pkg.name.clone(),
         version: local(&pkg.version).unwrap_or_else(|| version.to_string()),
         description: local(&pkg.description),
@@ -74,7 +71,7 @@ pub(crate) async fn crate_metadata(
         authors: local(&pkg.authors).unwrap_or_default(),
         keywords: local(&pkg.keywords).unwrap_or_default(),
         categories: local(&pkg.categories).unwrap_or_default(),
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -94,9 +91,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let meta = crate_metadata(env.context(), "axum", &version)
-            .await?
-            .expect("metadata present");
+        let meta = crate_metadata(env.context(), "axum", &version).await?;
         assert_eq!(meta.name, "axum");
         assert_eq!(meta.version, "0.8.9");
         assert!(meta.description.is_some());
