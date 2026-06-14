@@ -4,12 +4,33 @@ use crate::{
     errors::Error,
 };
 use anyhow::{Context as _, Result};
+use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 use tokio::{fs, task::spawn_blocking};
 use tracing::debug;
+
+/// read the format version from a rustdoc JSON file.
+async fn read_format_version_from_rustdoc_json(path: impl AsRef<Path>) -> Result<u32> {
+    #[derive(Deserialize)]
+    struct RustdocJson {
+        format_version: u32,
+    }
+
+    let path = path.as_ref().to_path_buf();
+    spawn_blocking(move || {
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+        let decoder = zstd::stream::read::Decoder::new(reader)?;
+
+        let rustdoc_json: RustdocJson = serde_json::from_reader(decoder)?;
+
+        Ok(rustdoc_json.format_version)
+    })
+    .await?
+}
 
 /// build a rustdoc json download url.
 ///
@@ -87,6 +108,11 @@ pub(crate) async fn get_docs(
                 }
                 Err(err) => return Err(err),
             };
+
+            let format_version = read_format_version_from_rustdoc_json(&path).await?;
+            if format_version != rustdoc_types::FORMAT_VERSION {
+                return Err(Error::UnsupportedRustdocJsonVersion(format_version));
+            }
 
             Ok(Arc::new(parse_rustdoc_json(&path).await?))
         })

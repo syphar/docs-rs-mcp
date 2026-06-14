@@ -17,6 +17,9 @@ pub(crate) enum Error {
     #[error("resource not found")]
     ResourceNotFound(String),
 
+    #[error("unsupported rustdoc json version: {0}")]
+    UnsupportedRustdocJsonVersion(u32),
+
     #[error("item not found: {0}")]
     ItemNotFound(String),
 
@@ -49,6 +52,9 @@ impl From<Error> for ErrorData {
             Error::MissingMetadata(_) => ErrorData::resource_not_found(value.to_string(), None),
             Error::ResourceNotFound(_) => ErrorData::resource_not_found(value.to_string(), None),
             Error::ItemNotFound(_) => ErrorData::resource_not_found(value.to_string(), None),
+            Error::UnsupportedRustdocJsonVersion(_) => {
+                ErrorData::resource_not_found(value.to_string(), None)
+            }
             Error::Io(error) => ErrorData::internal_error(error.to_string(), None),
             Error::Http(error) => ErrorData::internal_error(error.to_string(), None),
             Error::Other(error) => ErrorData::internal_error(error.to_string(), None),
@@ -65,6 +71,7 @@ impl From<Arc<Error>> for Error {
             Error::MissingMetadata(metadata) => Self::MissingMetadata(metadata.clone()),
             Error::ResourceNotFound(name) => Self::ResourceNotFound(name.clone()),
             Error::ItemNotFound(path) => Self::ItemNotFound(path.clone()),
+            Error::UnsupportedRustdocJsonVersion(v) => Self::UnsupportedRustdocJsonVersion(*v),
             // FIXME: how to keep the original error variant?
             Error::Http(error) => Self::Other(anyhow!(error.to_string())),
             Error::Io(error) => Self::Other(anyhow!(error.to_string())),
