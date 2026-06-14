@@ -27,6 +27,7 @@ mod tools;
 mod types;
 
 pub(crate) const APP_NAME: &str = env!("CARGO_PKG_NAME");
+const ENV_NAME: &str = "DOCS_RS_MCP_LOG";
 
 /// Forces a `flush()` after every `write()`. We use it on the file layer so
 /// abrupt SIGKILL (e.g. from MCP clients tearing down the stdio child) doesn't
@@ -67,11 +68,12 @@ fn init_tracing(config: &Config) -> Result<()> {
     let stderr_layer = fmt::layer()
         .compact()
         .with_writer(std::io::stderr)
-        .with_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        .with_filter(
             EnvFilter::builder()
+                .with_env_var(ENV_NAME)
                 .with_default_directive(LevelFilter::WARN.into())
-                .parse_lossy("")
-        }));
+                .from_env_lossy(),
+        );
 
     // Wrap in Mutex<FlushOnWrite<_>> so `MakeWriter` is satisfied and every
     // event hits disk before write() returns. RollingFileAppender's own
@@ -86,11 +88,12 @@ fn init_tracing(config: &Config) -> Result<()> {
         // `time.idle` durations. Combined with `#[tracing::instrument]` on
         // tool handlers, this gives you per-call timing data in the log.
         .with_span_events(FmtSpan::CLOSE)
-        .with_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        .with_filter(
             EnvFilter::builder()
+                .with_env_var(ENV_NAME)
                 .with_default_directive(LevelFilter::INFO.into())
-                .parse_lossy(format!("{APP_NAME}=debug"))
-        }));
+                .from_env_lossy(),
+        );
 
     tracing_subscriber::registry()
         .with(stderr_layer)
