@@ -37,7 +37,7 @@ impl DocsServer {
         }
     }
 
-    #[doc = include_str!("../instructions/tools/resolve_version.description.md")]
+    #[doc = include_str!("../instructions/tools/resolve_version.md")]
     #[tool]
     async fn resolve_version(
         &self,
@@ -46,7 +46,7 @@ impl DocsServer {
         resolve_version::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/search_items.description.md")]
+    #[doc = include_str!("../instructions/tools/search_items.md")]
     #[tool]
     async fn search_items(
         &self,
@@ -55,7 +55,7 @@ impl DocsServer {
         search_items::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/list_module.description.md")]
+    #[doc = include_str!("../instructions/tools/list_module.md")]
     #[tool]
     async fn list_module(
         &self,
@@ -64,7 +64,7 @@ impl DocsServer {
         list_module::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/get_item.description.md")]
+    #[doc = include_str!("../instructions/tools/get_item.md")]
     #[tool]
     async fn get_item(
         &self,
@@ -73,7 +73,7 @@ impl DocsServer {
         get_item::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/list_methods.description.md")]
+    #[doc = include_str!("../instructions/tools/list_methods.md")]
     #[tool]
     async fn list_methods(
         &self,
@@ -82,7 +82,7 @@ impl DocsServer {
         list_methods::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/list_impls.description.md")]
+    #[doc = include_str!("../instructions/tools/list_impls.md")]
     #[tool]
     async fn list_impls(
         &self,
@@ -91,7 +91,7 @@ impl DocsServer {
         list_impls::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/list_implementors.description.md")]
+    #[doc = include_str!("../instructions/tools/list_implementors.md")]
     #[tool]
     async fn list_implementors(
         &self,
@@ -100,7 +100,7 @@ impl DocsServer {
         list_implementors::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/inspect_feature_flags.description.md")]
+    #[doc = include_str!("../instructions/tools/inspect_feature_flags.md")]
     #[tool]
     async fn inspect_feature_flags(
         &self,
@@ -109,7 +109,7 @@ impl DocsServer {
         inspect_feature_flags::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/crate_metadata.description.md")]
+    #[doc = include_str!("../instructions/tools/crate_metadata.md")]
     #[tool]
     async fn crate_metadata(
         &self,
@@ -118,7 +118,7 @@ impl DocsServer {
         crate_metadata::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/dependency_tree.description.md")]
+    #[doc = include_str!("../instructions/tools/dependency_tree.md")]
     #[tool]
     async fn dependency_tree(
         &self,
@@ -127,7 +127,7 @@ impl DocsServer {
         dependency_tree::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/changelog.description.md")]
+    #[doc = include_str!("../instructions/tools/changelog.md")]
     #[tool]
     async fn changelog(
         &self,
@@ -136,7 +136,7 @@ impl DocsServer {
         changelog::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/find_examples.description.md")]
+    #[doc = include_str!("../instructions/tools/find_examples.md")]
     #[tool]
     async fn find_examples(
         &self,
