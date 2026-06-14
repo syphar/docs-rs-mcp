@@ -22,6 +22,7 @@ Match the tool to the question:
    - "what is this crate" / "MSRV / license / repo" → `crate_metadata`.
    - "what does X depend on" → `dependency_tree`.
    - "what changed in X" / "any breaking changes" → `changelog`.
+   - "show me the README" / "how does this crate say to get started?" → `readme`.
    - "show me a working example" → `find_examples` first, fall back to `get_item` doctests.
 
 The `target` arg on the drill-in tools defaults to the host the server was compiled for (usually the user's machine). Override when the user's *project* targets something different (e.g. macOS dev → Linux deploy).

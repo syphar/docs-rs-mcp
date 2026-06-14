@@ -37,7 +37,7 @@ pub(crate) struct CrateMetadata {
 /// Extract the local (non-inherited) value of a `MaybeInherited<T>`, cloning
 /// it out of the borrowed manifest. Inherited values reference a workspace's
 /// Cargo.toml which we don't fetch; treat them as absent for this tool.
-fn local<T: Clone>(mi: &Option<MaybeInherited<T>>) -> Option<T> {
+pub(crate) fn local<T: Clone>(mi: &Option<MaybeInherited<T>>) -> Option<T> {
     mi.as_ref().and_then(|m| m.as_ref().as_local()).cloned()
 }
 

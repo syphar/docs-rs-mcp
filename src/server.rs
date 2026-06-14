@@ -11,6 +11,7 @@ use crate::{
         list_impls::{self, ListImplsArgs},
         list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
+        readme::{self, ReadmeArgs},
         resolve_version::{self, ResolveVersionArgs},
         search_items::{self, SearchItemsArgs},
     },
@@ -143,6 +144,15 @@ impl DocsServer {
         Parameters(args): Parameters<FindExamplesArgs>,
     ) -> Result<CallToolResult, McpError> {
         find_examples::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/readme.md")]
+    #[tool]
+    async fn readme(
+        &self,
+        Parameters(args): Parameters<ReadmeArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        readme::handle(&self.config, args).await
     }
 }
 
