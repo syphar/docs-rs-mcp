@@ -52,6 +52,13 @@ strings.
 - **All fetches are cached.** rustdoc JSON, crate sources, and version
   resolutions live under the user's cache dir; subsequent calls are local.
 
+## known limitations
+
+Right now, we're using just one version of rustdoc-types, which means we can
+only handle the rustdoc json output from nighty versions >= `2025-08-02`.
+
+When the docs.rs build is older, we will raise an error.
+
 ## Installation
 
 ```sh
