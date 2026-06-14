@@ -482,6 +482,7 @@ dependencies = [
  "futures-util",
  "mockito",
  "moka",
+ "parse-changelog",
  "pretty_assertions",
  "reqwest",
  "rmcp",
@@ -1377,6 +1378,17 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
+]
+
+[[package]]
+name = "parse-changelog"
+version = "0.6.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0878368d958d9eac74fcbbe62d3fa9fc0e6f1c2ea7c16f9cdbd7232722d58d9"
+dependencies = [
+ "indexmap",
+ "memchr",
+ "regex",
 ]
 
 [[package]]

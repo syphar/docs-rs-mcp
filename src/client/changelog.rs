@@ -1,5 +1,5 @@
 use crate::{client::get_source::fetch_source, context::Context};
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use serde::Serialize;
 use tokio::fs;
 
@@ -9,7 +9,14 @@ pub(crate) struct Changelog {
     pub(crate) source_file: String,
     /// Raw file content. If the changelog is huge, the caller can scope by
     /// passing a `version` filter to extract just one release.
-    pub(crate) content: String,
+    pub(crate) releases: Vec<Release>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct Release {
+    pub version: String,
+    pub title: String,
+    pub notes: String,
 }
 
 const CANDIDATES: &[&str] = &[
@@ -36,70 +43,44 @@ pub(crate) async fn changelog(
         return Ok(None);
     };
 
-    let mut changelog = None;
+    let mut filename = None;
     for candidate in CANDIDATES {
         let candidate = source_dir.join(candidate);
         if fs::try_exists(&candidate).await? {
-            changelog = Some(candidate);
+            filename = Some(candidate);
             break;
         }
     }
 
-    let Some(changelog) = changelog else {
+    let Some(filename) = filename else {
         return Ok(None);
     };
 
-    let bytes = fs::read(&changelog).await?;
+    let bytes = fs::read(&filename).await?;
+    let text = String::from_utf8_lossy(&bytes);
 
-    let text = String::from_utf8_lossy(&bytes).into_owned();
-    let content = match section_version {
-        Some(v) => extract_version_section(&text, v).unwrap_or(text),
-        None => text,
+    let entries = parse_changelog::parse(&text).context("error parsing changelog")?;
+
+    let filtered: Vec<_> = if let Some(section_version) = section_version {
+        let Some(release) = entries.get(section_version) else {
+            return Ok(None);
+        };
+        vec![release]
+    } else {
+        entries.values().collect::<Vec<_>>()
     };
 
     Ok(Some(Changelog {
-        source_file: changelog.display().to_string(),
-        content,
+        source_file: filename.display().to_string(),
+        releases: filtered
+            .into_iter()
+            .map(|cl| Release {
+                version: cl.version.to_string(),
+                title: cl.title.to_string(),
+                notes: cl.notes.to_string(),
+            })
+            .collect(),
     }))
-}
-
-/// Best-effort section extractor. Looks for a markdown heading containing the
-/// requested version string and captures lines up to the next heading at the
-/// same or higher level. Heuristic — changelog formats vary. Returns `None`
-/// if no matching heading is found.
-fn extract_version_section(text: &str, version: &str) -> Option<String> {
-    let lines = text.lines().peekable();
-    let mut start_level: Option<usize> = None;
-    let mut captured = String::new();
-    for line in lines {
-        let level = heading_level(line);
-        if start_level.is_none() {
-            // Look for a heading line that mentions the version.
-            if level.is_some() && line.contains(version) {
-                start_level = level;
-                captured.push_str(line);
-                captured.push('\n');
-            }
-        } else {
-            // Capturing — stop at the next heading at the same-or-higher level.
-            #[allow(clippy::unnecessary_unwrap)]
-            if let Some(lvl) = level
-                && lvl <= start_level.unwrap()
-            {
-                break;
-            }
-            captured.push_str(line);
-            captured.push('\n');
-        }
-    }
-    let trimmed = captured.trim();
-    (!trimmed.is_empty()).then(|| trimmed.to_string())
-}
-
-fn heading_level(line: &str) -> Option<usize> {
-    let trimmed = line.trim_start();
-    let hashes = trimmed.bytes().take_while(|b| *b == b'#').count();
-    (hashes > 0 && hashes <= 6 && trimmed.as_bytes().get(hashes) == Some(&b' ')).then_some(hashes)
 }
 
 #[cfg(test)]
@@ -123,26 +104,58 @@ mod tests {
             .await?
             .expect("changelog present");
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));
-        assert!(!cl.content.is_empty());
+
+        assert_eq!(cl.releases.len(), 90);
+        assert!(
+            cl.releases
+                .iter()
+                .all(|r| !(r.notes.is_empty() || r.version.is_empty() || r.title.is_empty()))
+        );
         Ok(())
     }
 
-    #[test]
-    fn test_extract_version_section() {
-        let text = "\
-# Changelog
+    #[tokio::test]
+    async fn test_axum_changelog_single() -> Result<()> {
+        let mut env = test_env().await?;
+        let version = semver::Version::new(0, 8, 9);
+        let fixture = crate::test_utils::fixture("axum-0.8.9.crate")?;
+        let _mock = env
+            .server
+            .mock("GET", "/crates/axum/axum-0.8.9.crate")
+            .with_status(200)
+            .with_body_from_file(&fixture)
+            .create();
 
-## 1.0.0 — 2026-01-01
+        let cl = changelog(env.context(), "axum", &version, Some("0.8.8"))
+            .await?
+            .expect("changelog present");
+        assert!(cl.source_file.ends_with("/CHANGELOG.md"));
 
-- Big release.
-- Another change.
+        assert_eq!(cl.releases.len(), 1);
 
-## 0.9.0 — 2025-12-01
+        let r = &cl.releases[0];
+        assert!(!(r.notes.is_empty() || r.version.is_empty() || r.title.is_empty()));
+        Ok(())
+    }
 
-- Older stuff.
-";
-        let section = extract_version_section(text, "1.0.0").unwrap();
-        assert!(section.contains("Big release"));
-        assert!(!section.contains("Older stuff"));
+    #[tokio::test]
+    async fn test_axum_changelog_unknown() -> Result<()> {
+        let mut env = test_env().await?;
+        let version = semver::Version::new(0, 8, 9);
+        let fixture = crate::test_utils::fixture("axum-0.8.9.crate")?;
+        let _mock = env
+            .server
+            .mock("GET", "/crates/axum/axum-0.8.9.crate")
+            .with_status(200)
+            .with_body_from_file(&fixture)
+            .create();
+
+        assert!(
+            changelog(env.context(), "axum", &version, Some("9.9.9"))
+                .await?
+                .is_none()
+        );
+
+        Ok(())
     }
 }
