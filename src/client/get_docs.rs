@@ -112,12 +112,26 @@ pub(crate) async fn get_docs(
                 Err(err) => return Err(err),
             };
 
-            let format_version = read_format_version_from_rustdoc_json(&path).await?;
-            if format_version != rustdoc_types::FORMAT_VERSION {
-                return Err(Error::UnsupportedRustdocJsonVersion(format_version));
+            // Parse the file in a single pass and read `format_version` off the
+            // result. `format_version` is the last field of the rustdoc JSON
+            // object, so reading it separately would require decompressing and
+            // tokenizing the whole file a second time. If parsing fails we fall
+            // back to reading just the version, which lets us report an
+            // unsupported-version error precisely instead of a raw parse error.
+            match parse_rustdoc_json(&path).await {
+                Ok(krate) if krate.format_version == rustdoc_types::FORMAT_VERSION => {
+                    Ok(Arc::new(krate))
+                }
+                Ok(krate) => Err(Error::UnsupportedRustdocJsonVersion(krate.format_version)),
+                Err(parse_err) => {
+                    let format_version = read_format_version_from_rustdoc_json(&path).await?;
+                    if format_version != rustdoc_types::FORMAT_VERSION {
+                        Err(Error::UnsupportedRustdocJsonVersion(format_version))
+                    } else {
+                        Err(parse_err.into())
+                    }
+                }
             }
-
-            Ok(Arc::new(parse_rustdoc_json(&path).await?))
         })
         .await?
         .into_value())
