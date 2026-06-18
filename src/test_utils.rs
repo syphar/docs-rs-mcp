@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+use tokio::task::spawn_blocking;
 
 pub(crate) struct TestEnv {
     context: Context,
@@ -24,7 +25,7 @@ impl TestEnv {
 pub(crate) async fn test_env() -> Result<TestEnv> {
     let server = mockito::Server::new_async().await;
 
-    let cache_dir = tempfile::TempDir::new()?;
+    let cache_dir = spawn_blocking(tempfile::TempDir::new).await??;
     let server_url = Url::parse(&server.url()).unwrap();
     let config = Config {
         cache_dir: cache_dir.path().to_path_buf(),
@@ -32,10 +33,11 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
         docs_rs_server: server_url.clone(),
         static_crates_io: server_url.clone(),
         resolver_cache_ttl: Duration::from_secs(0),
+        opentelemetry_grpc_endpoint: None,
     };
 
     Ok(TestEnv {
-        context: Context::new(config),
+        context: Context::new(config).await?,
         server,
         _cache_dir: cache_dir,
     })

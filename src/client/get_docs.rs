@@ -10,9 +10,10 @@ use std::{
     sync::Arc,
 };
 use tokio::{fs, task::spawn_blocking};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 /// read the format version from a rustdoc JSON file.
+#[instrument(skip_all, fields(path=%path.as_ref().display()))]
 async fn read_format_version_from_rustdoc_json(path: impl AsRef<Path>) -> Result<u32> {
     #[derive(Deserialize)]
     struct RustdocJson {
@@ -44,6 +45,7 @@ pub(crate) fn build_download_url(krate: &str, version: &str, target: Option<&str
     }
 }
 
+#[instrument(skip(context))]
 async fn fetch_rustdoc_json(
     context: &Context,
     krate: &str,
@@ -85,6 +87,7 @@ async fn fetch_rustdoc_json(
 ///
 /// Returns `Ok(None)` only when even the crate's default build doesn't exist
 /// (typically: unknown crate or version).
+#[instrument(skip(context))]
 pub(crate) async fn get_docs(
     context: &Context,
     krate: &str,
@@ -120,6 +123,7 @@ pub(crate) async fn get_docs(
         .into_value())
 }
 
+#[instrument(skip_all, fields(path=%path.as_ref().display()))]
 pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
     let path = path.as_ref().to_path_buf();
     spawn_blocking(move || {

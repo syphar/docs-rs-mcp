@@ -19,6 +19,7 @@ pub(crate) fn build_download_url(krate: &str, version: &str) -> String {
     format!("/crates/{krate}/{krate}-{version}.crate")
 }
 
+#[instrument(skip(context))]
 pub(crate) async fn fetch_crate(
     context: &Context,
     krate: &str,
@@ -80,6 +81,7 @@ async fn extract_source(path: impl AsRef<Path>, name: &str, version: &str) -> Re
     .await?
 }
 
+#[instrument(skip(config))]
 pub(crate) async fn fetch_source(
     config: &Context,
     krate: &str,
@@ -93,6 +95,7 @@ pub(crate) async fn fetch_source(
     Ok(source_dir)
 }
 
+#[instrument(skip_all, fields(source_dir=%source_dir.as_ref().display()))]
 pub(crate) async fn parse_cargo_manifest(
     source_dir: impl AsRef<Path>,
 ) -> Result<cargo_manifest::Manifest, Error> {
@@ -111,6 +114,7 @@ pub(crate) async fn parse_cargo_manifest(
 /// parse it into the typed `cargo_manifest::Manifest`. Pure parser — does
 /// not shell out to `cargo`. Returns `Ok(None)` when the crate/version isn't
 /// on crates.io.
+#[instrument(skip(context))]
 pub(crate) async fn fetch_cargo_manifest(
     context: &Context,
     krate: &str,
