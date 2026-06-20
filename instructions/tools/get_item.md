@@ -2,7 +2,7 @@ Return the full record for a single item by its fully-qualified path. Requires a
 
 `path` accepts either canonical or re-export paths (e.g. `"axum::Router"` resolves to its canonical `"axum::routing::Router"`); the `path` field on the result is always the canonical path. Returns the same `target` defaulting and fallback semantics as `search_items` / `list_module`.
 
-The result includes:
+The response includes target-resolution metadata plus an `item` containing:
   - `kind`, `name`, `path`, `id`
   - `inner`: structured rustdoc info (signature, generics, where-clauses, fields/variants/function decl, etc.); shape varies by `kind`
   - `deprecation`, `span`, `attrs`

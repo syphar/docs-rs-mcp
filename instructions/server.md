@@ -32,4 +32,4 @@ Rustdoc JSON availability and version fallback:
    - Do not use latest-version fallback for changelog, dependency, feature, README, example, license, MSRV, or package metadata questions about a specific release; those tools read the crate source archive and should stay tied to the requested version.
    - When a rustdoc-json tool fails for an old exact version and the user's intent is general API discovery, call `resolve_version(krate, "*")`, then retry the same rustdoc-json tool with that latest version and mention the fallback.
 
-The `target` arg on the drill-in tools defaults to the host the server was compiled for (usually the user's machine). Override when the user's *project* targets something different (e.g. macOS dev → Linux deploy).
+The `target` arg on the drill-in tools defaults to the host the server was compiled for (usually the user's machine). Override when the user's *project* targets something different (e.g. macOS dev → Linux deploy). Rustdoc-backed responses report `requested_target`, `resolved_target`, and `target_fallback`; when fallback is true and `resolved_target` is absent, docs.rs served the crate author's default target.

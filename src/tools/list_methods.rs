@@ -1,5 +1,8 @@
 use crate::{
-    client::{get_docs::get_docs, list_methods},
+    client::{
+        get_docs::{TargetResolution, get_docs},
+        list_methods,
+    },
     context::Context,
     tools::render_response,
     types::semver::Version,
@@ -29,6 +32,8 @@ pub(crate) struct ListMethodsArgs {
 
 #[derive(Debug, Serialize)]
 struct ListMethodsResult {
+    #[serde(flatten)]
+    target: TargetResolution,
     methods: Vec<list_methods::Method>,
 }
 
@@ -54,5 +59,8 @@ pub(crate) async fn handle(
     let methods = list_methods::list_methods(&docs, &path)
         .ok_or_else(|| McpError::resource_not_found("type not found at the given path", None))?;
 
-    render_response(ListMethodsResult { methods })
+    render_response(ListMethodsResult {
+        target: docs.target_resolution(),
+        methods,
+    })
 }

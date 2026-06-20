@@ -1,6 +1,6 @@
 use crate::{
     client::{
-        get_docs::get_docs,
+        get_docs::{TargetResolution, get_docs},
         get_item::{self, Verbosity},
     },
     context::Context,
@@ -9,6 +9,7 @@ use crate::{
     types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
+use serde::Serialize;
 
 const HOST_TARGET: &str = env!("BUILD_TARGET");
 
@@ -38,6 +39,13 @@ pub(crate) struct GetItemArgs {
     pub(crate) target: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct GetItemResult {
+    #[serde(flatten)]
+    target: TargetResolution,
+    item: get_item::ItemRecord,
+}
+
 #[tracing::instrument(
     name = "tool.get_item",
     skip(context),
@@ -61,5 +69,8 @@ pub(crate) async fn handle(
     let record = get_item::get_item(&docs, &path, args.verbosity)
         .ok_or_else(|| Error::item_not_found(path))?;
 
-    render_response(record)
+    render_response(GetItemResult {
+        target: docs.target_resolution(),
+        item: record,
+    })
 }

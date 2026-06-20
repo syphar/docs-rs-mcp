@@ -4,13 +4,51 @@ use crate::{
     errors::Error,
 };
 use anyhow::{Context as _, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
+    ops::Deref,
     path::{Path, PathBuf},
     sync::Arc,
 };
 use tokio::{fs, task::spawn_blocking};
 use tracing::{debug, instrument};
+
+#[derive(Debug)]
+pub(crate) struct LoadedDocs {
+    docs: rustdoc_types::Crate,
+    pub(crate) requested_target: Option<String>,
+    pub(crate) resolved_target: Option<String>,
+    pub(crate) target_fallback: bool,
+}
+
+impl Deref for LoadedDocs {
+    type Target = rustdoc_types::Crate;
+
+    fn deref(&self) -> &Self::Target {
+        &self.docs
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct TargetResolution {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) requested_target: Option<String>,
+    /// `None` means docs.rs served the crate author's default target, whose
+    /// concrete triple is not exposed by the rustdoc JSON download endpoint.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) resolved_target: Option<String>,
+    pub(crate) target_fallback: bool,
+}
+
+impl LoadedDocs {
+    pub(crate) fn target_resolution(&self) -> TargetResolution {
+        TargetResolution {
+            requested_target: self.requested_target.clone(),
+            resolved_target: self.resolved_target.clone(),
+            target_fallback: self.target_fallback,
+        }
+    }
+}
 
 /// read the format version from a rustdoc JSON file.
 #[instrument(skip_all, fields(path=%path.as_ref().display()))]
@@ -95,7 +133,7 @@ pub(crate) async fn get_docs(
     krate: &str,
     version: &semver::Version,
     target: Option<&str>,
-) -> Result<Arc<rustdoc_types::Crate>, Error> {
+) -> Result<Arc<LoadedDocs>, Error> {
     let key = DocsKey {
         name: krate.to_string(),
         version: version.to_owned(),
@@ -106,13 +144,16 @@ pub(crate) async fn get_docs(
         .rustdoc_json_cache
         .entry(key)
         .or_try_insert_with::<_, Error>(async move {
-            let path = match fetch_rustdoc_json(context, krate, version, target).await {
-                Ok(p) => p,
-                Err(err) if matches!(err, Error::VersionNotFound(_)) && target.is_some() => {
-                    fetch_rustdoc_json(context, krate, version, None).await?
-                }
-                Err(err) => return Err(err),
-            };
+            let (path, resolved_target, target_fallback) =
+                match fetch_rustdoc_json(context, krate, version, target).await {
+                    Ok(p) => (p, target.map(str::to_string), false),
+                    Err(err) if matches!(err, Error::VersionNotFound(_)) && target.is_some() => (
+                        fetch_rustdoc_json(context, krate, version, None).await?,
+                        None,
+                        true,
+                    ),
+                    Err(err) => return Err(err),
+                };
 
             // Parse the file in a single pass and read `format_version` off the
             // result. `format_version` is the last field of the rustdoc JSON
@@ -122,7 +163,12 @@ pub(crate) async fn get_docs(
             // unsupported-version error precisely instead of a raw parse error.
             match parse_rustdoc_json(&path).await {
                 Ok(krate) if krate.format_version == rustdoc_types::FORMAT_VERSION => {
-                    Ok(Arc::new(krate))
+                    Ok(Arc::new(LoadedDocs {
+                        docs: krate,
+                        requested_target: target.map(str::to_string),
+                        resolved_target,
+                        target_fallback,
+                    }))
                 }
                 Ok(krate) => Err(Error::UnsupportedRustdocJsonVersion(krate.format_version)),
                 Err(parse_err) => {
@@ -185,7 +231,42 @@ mod tests {
         let root = &docs.paths[&docs.root];
         assert_eq!(root.path, vec!["axum"]);
         assert_eq!(root.kind, rustdoc_types::ItemKind::Module);
+        assert_eq!(docs.requested_target.as_deref(), target);
+        assert_eq!(docs.resolved_target.as_deref(), target);
+        assert!(!docs.target_fallback);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn reports_target_fallback() -> Result<()> {
+        let mut env = test_env().await?;
+        let version = semver::Version::new(0, 8, 9);
+        let fixture_path = fixture("axum_0.8.9.json.zst")?;
+
+        let _target_mock = env
+            .server
+            .mock(
+                "GET",
+                build_download_url("axum", &version.to_string(), Some("missing-target")).as_str(),
+            )
+            .with_status(404)
+            .create();
+        let _default_mock = env
+            .server
+            .mock(
+                "GET",
+                build_download_url("axum", &version.to_string(), None).as_str(),
+            )
+            .with_status(200)
+            .with_body_from_file(&fixture_path)
+            .create();
+
+        let docs = get_docs(env.context(), "axum", &version, Some("missing-target")).await?;
+
+        assert_eq!(docs.requested_target.as_deref(), Some("missing-target"));
+        assert_eq!(docs.resolved_target, None);
+        assert!(docs.target_fallback);
         Ok(())
     }
 }

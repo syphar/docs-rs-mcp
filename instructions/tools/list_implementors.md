@@ -7,4 +7,4 @@ Each row has:
 
 Limitation: rustdoc JSON is single-crate. Implementations in *other* crates (e.g. a downstream crate implementing this trait on its own type) are not visible here. To find those you'd have to search those crates explicitly.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.
+Requires an exact `version` and reports the same target-resolution metadata as other rustdoc-backed tools.

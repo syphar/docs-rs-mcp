@@ -19,4 +19,4 @@ Limitations:
 
 Related: `list_impls` returns the traits a type implements (no method bodies). `list_implementors` is the inverse — types that implement a given trait.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.
+Requires an exact `version` and reports the same target-resolution metadata as other rustdoc-backed tools.
