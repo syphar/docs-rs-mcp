@@ -13,6 +13,29 @@ pub(crate) struct ChangelogArgs {
     /// full changelog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) section_version: Option<String>,
+    /// Inclusive lower release bound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) from_version: Option<Version>,
+    /// Inclusive upper release bound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) to_version: Option<Version>,
+    /// Maximum releases to return. Defaults to 20.
+    #[serde(default = "default_limit")]
+    pub(crate) limit: usize,
+    /// Return only the first paragraph of each release note.
+    #[serde(default)]
+    pub(crate) summary_only: bool,
+    /// Maximum note characters per release. Defaults to 20,000.
+    #[serde(default = "default_max_chars")]
+    pub(crate) max_chars: usize,
+}
+
+fn default_limit() -> usize {
+    20
+}
+
+fn default_max_chars() -> usize {
+    20_000
 }
 
 #[tracing::instrument(
@@ -33,7 +56,14 @@ pub(crate) async fn handle(
             context,
             &args.krate,
             args.version.as_ref(),
-            args.section_version.as_deref(),
+            changelog::ChangelogQuery {
+                section_version: args.section_version.as_deref(),
+                from_version: args.from_version.as_deref(),
+                to_version: args.to_version.as_deref(),
+                limit: args.limit,
+                summary_only: args.summary_only,
+                max_chars: args.max_chars,
+            },
         )
         .await?,
     )

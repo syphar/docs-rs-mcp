@@ -17,6 +17,8 @@ pub(crate) struct Release {
     pub version: String,
     pub title: String,
     pub notes: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub notes_truncated: bool,
 }
 
 const CANDIDATES: &[&str] = &[
@@ -30,6 +32,15 @@ const CANDIDATES: &[&str] = &[
     "NEWS",
 ];
 
+pub(crate) struct ChangelogQuery<'a> {
+    pub(crate) section_version: Option<&'a str>,
+    pub(crate) from_version: Option<&'a semver::Version>,
+    pub(crate) to_version: Option<&'a semver::Version>,
+    pub(crate) limit: usize,
+    pub(crate) summary_only: bool,
+    pub(crate) max_chars: usize,
+}
+
 /// Find and return the crate's changelog. Tries the conventional filenames in
 /// order; the first one that exists wins. When `version` is `Some`, returns
 /// only the section for that version (best-effort heuristic — see code).
@@ -37,7 +48,7 @@ pub(crate) async fn changelog(
     context: &Context,
     krate: &str,
     version: &semver::Version,
-    section_version: Option<&str>,
+    query: ChangelogQuery<'_>,
 ) -> Result<Changelog, Error> {
     let source_dir = fetch_source(context, krate, version).await?;
 
@@ -59,7 +70,7 @@ pub(crate) async fn changelog(
 
     let entries = parse_changelog::parse(&text).context("error parsing changelog")?;
 
-    let filtered: Vec<_> = if let Some(section_version) = section_version {
+    let mut filtered: Vec<_> = if let Some(section_version) = query.section_version {
         let Some(release) = entries.get(section_version) else {
             return Err(Error::ResourceNotFound(format!(
                 "version {} in changelog",
@@ -68,17 +79,40 @@ pub(crate) async fn changelog(
         };
         vec![release]
     } else {
-        entries.values().collect::<Vec<_>>()
+        entries
+            .values()
+            .filter(|release| {
+                let Ok(version) = semver::Version::parse(release.version) else {
+                    return query.from_version.is_none() && query.to_version.is_none();
+                };
+                query.from_version.is_none_or(|from| &version >= from)
+                    && query.to_version.is_none_or(|to| &version <= to)
+            })
+            .collect::<Vec<_>>()
     };
+    filtered.truncate(query.limit);
 
     Ok(Changelog {
         source_file: filename.display().to_string(),
         releases: filtered
             .into_iter()
-            .map(|cl| Release {
-                version: cl.version.to_string(),
-                title: cl.title.to_string(),
-                notes: cl.notes.to_string(),
+            .map(|cl| {
+                let notes = if query.summary_only {
+                    cl.notes
+                        .lines()
+                        .take_while(|line| !line.trim().is_empty())
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                } else {
+                    cl.notes.to_string()
+                };
+                let notes_truncated = notes.chars().count() > query.max_chars;
+                Release {
+                    version: cl.version.to_string(),
+                    title: cl.title.to_string(),
+                    notes: notes.chars().take(query.max_chars).collect(),
+                    notes_truncated,
+                }
             })
             .collect(),
     })
@@ -88,6 +122,17 @@ pub(crate) async fn changelog(
 mod tests {
     use super::*;
     use crate::test_utils::test_env;
+
+    fn query(section_version: Option<&str>) -> ChangelogQuery<'_> {
+        ChangelogQuery {
+            section_version,
+            from_version: None,
+            to_version: None,
+            limit: usize::MAX,
+            summary_only: false,
+            max_chars: usize::MAX,
+        }
+    }
 
     #[tokio::test]
     async fn test_axum_changelog() -> Result<()> {
@@ -101,7 +146,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let cl = changelog(env.context(), "axum", &version, None).await?;
+        let cl = changelog(env.context(), "axum", &version, query(None)).await?;
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));
 
         assert_eq!(cl.releases.len(), 90);
@@ -125,7 +170,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let cl = changelog(env.context(), "axum", &version, Some("0.8.8")).await?;
+        let cl = changelog(env.context(), "axum", &version, query(Some("0.8.8"))).await?;
         assert!(cl.source_file.ends_with("/CHANGELOG.md"));
 
         assert_eq!(cl.releases.len(), 1);
@@ -148,7 +193,7 @@ mod tests {
             .create();
 
         assert!(matches!(
-            changelog(env.context(), "axum", &version, Some("9.9.9"))
+            changelog(env.context(), "axum", &version, query(Some("9.9.9")))
                 .await
                 .unwrap_err(),
             Error::ResourceNotFound(_)
