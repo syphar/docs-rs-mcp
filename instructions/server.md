@@ -25,6 +25,7 @@ Match the tool to the question:
    - "what API changed between X and Y" / migration planning → `compare_versions`, then inspect changed items and changelog sections.
    - "show me the README" / "how does this crate say to get started?" → `readme`.
    - "show me a working example" → `find_examples` first, fall back to `get_item` doctests.
+   - "where is this implemented" / "find this error text" → `search_source`, then `read_source_file`.
 
 Rustdoc JSON availability and version fallback:
    - `search_items`, `list_module`, `get_item`, `list_methods`, `list_impls`, and `list_implementors` require docs.rs rustdoc JSON for the exact crate version and target. Older crate releases may have no rustdoc JSON, or may have rustdoc JSON in an older format this server cannot parse.

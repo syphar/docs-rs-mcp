@@ -12,9 +12,11 @@ pub(crate) mod list_impls;
 pub(crate) mod list_methods;
 pub(crate) mod list_module;
 pub(crate) mod manifest_dependencies;
+pub(crate) mod read_source_file;
 pub(crate) mod readme;
 pub(crate) mod resolve_version;
 pub(crate) mod search_items;
+pub(crate) mod search_source;
 
 pub(crate) fn render_response<T: Serialize>(response: T) -> Result<CallToolResult, McpError> {
     Ok(CallToolResult::structured(

@@ -15,7 +15,7 @@ hosting an extended version of it.
 
 ## What it gives you
 
-Fourteen tools, all answering specific natural-language questions:
+Sixteen tools, all answering specific natural-language questions:
 
 | Tool | Answers |
 |---|---|
@@ -33,6 +33,8 @@ Fourteen tools, all answering specific natural-language questions:
 | `compare_versions` | *"what changed between versions X and Y?"* |
 | `find_examples` | *"show me a working example"* |
 | `readme` | *"how does this crate say to get started?"* |
+| `search_source` | *"where is this implemented?"* |
+| `read_source_file` | *"show me this published source file"* |
 
 Results are structured JSON — signatures keep their full rustdoc shape
 (generics, where-clauses, fields, variants, function decl), not flattened to

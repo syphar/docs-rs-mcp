@@ -628,6 +628,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "url",
+ "walkdir",
  "zstd",
 ]
 

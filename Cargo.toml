@@ -52,6 +52,7 @@ tracing-appender = "0.2.5"
 tracing-opentelemetry = "0.33.0"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 url = { version = "2.5.8", features = ["serde"] }
+walkdir = "2.5.0"
 zstd = "0.13.3"
 
 [dev-dependencies]

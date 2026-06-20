@@ -12,9 +12,11 @@ use crate::{
         list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
         manifest_dependencies::{self, ManifestDependenciesArgs},
+        read_source_file::{self, ReadSourceFileArgs},
         readme::{self, ReadmeArgs},
         resolve_version::{self, ResolveVersionArgs},
         search_items::{self, SearchItemsArgs},
+        search_source::{self, SearchSourceArgs},
     },
 };
 use rmcp::{
@@ -163,6 +165,24 @@ impl DocsServer {
         Parameters(args): Parameters<ReadmeArgs>,
     ) -> Result<CallToolResult, McpError> {
         readme::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/search_source.md")]
+    #[tool]
+    async fn search_source(
+        &self,
+        Parameters(args): Parameters<SearchSourceArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        search_source::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/read_source_file.md")]
+    #[tool]
+    async fn read_source_file(
+        &self,
+        Parameters(args): Parameters<ReadSourceFileArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        read_source_file::handle(&self.config, args).await
     }
 }
 
