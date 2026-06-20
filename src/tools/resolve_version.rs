@@ -9,12 +9,74 @@ use std::sync::Arc;
 pub(crate) struct ResolveVersionArgs {
     /// Name of the crate on crates.io / docs.rs.
     pub(crate) krate: String,
-    /// Cargo-style semver requirement. Bare versions are caret requirements:
-    /// "1.2.3" means ">=1.2.3, <2.0.0" (compatible), not an exact match.
-    /// Use "=1.2.3" for an exact version. Other examples: "1", "^1.5",
-    /// "~1.2", ">=1.2, <1.5", "*". Defaults to "*" (latest).
+    /// Semver requirement. A fully-qualified bare version such as "1.2.3"
+    /// is treated as an exact match. Partial versions and explicit
+    /// requirements use Cargo semantics. Examples: "1.2", "^1.5", "~1.2",
+    /// ">=1.2, <1.5", "*". Defaults to "*" (latest).
     #[serde(default)]
     pub(crate) req: VersionReq,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{client::status::Status, test_utils::test_env};
+    use anyhow::Result;
+
+    #[tokio::test]
+    async fn resolver_cache_is_scoped_by_crate_name() -> Result<()> {
+        let mut env = test_env().await?;
+        let axum = Status {
+            doc_status: true,
+            version: semver::Version::new(0, 8, 9),
+        };
+        let tokio = Status {
+            doc_status: true,
+            version: semver::Version::new(1, 45, 1),
+        };
+
+        let _axum_mock = env
+            .server
+            .mock("GET", "/crate/axum/*/status.json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::to_string(&axum)?)
+            .create();
+        let _tokio_mock = env
+            .server
+            .mock("GET", "/crate/tokio/*/status.json")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(serde_json::to_string(&tokio)?)
+            .create();
+
+        let axum_result = handle(
+            env.context(),
+            ResolveVersionArgs {
+                krate: "axum".into(),
+                req: VersionReq::default(),
+            },
+        )
+        .await?;
+        let tokio_result = handle(
+            env.context(),
+            ResolveVersionArgs {
+                krate: "tokio".into(),
+                req: VersionReq::default(),
+            },
+        )
+        .await?;
+
+        assert_eq!(
+            axum_result.structured_content,
+            Some(serde_json::to_value(axum)?)
+        );
+        assert_eq!(
+            tokio_result.structured_content,
+            Some(serde_json::to_value(tokio)?)
+        );
+        Ok(())
+    }
 }
 
 #[tracing::instrument(
