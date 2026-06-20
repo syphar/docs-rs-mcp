@@ -3,6 +3,7 @@ use crate::{
     tools::{
         changelog::{self, ChangelogArgs},
         crate_metadata::{self, CrateMetadataArgs},
+        crate_overview::{self, CrateOverviewArgs},
         find_examples::{self, FindExamplesArgs},
         get_item::{self, GetItemArgs},
         inspect_feature_flags::{self, InspectFeatureFlagsArgs},
@@ -117,6 +118,15 @@ impl DocsServer {
         Parameters(args): Parameters<CrateMetadataArgs>,
     ) -> Result<CallToolResult, McpError> {
         crate_metadata::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/crate_overview.md")]
+    #[tool]
+    async fn crate_overview(
+        &self,
+        Parameters(args): Parameters<CrateOverviewArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        crate_overview::handle(&self.config, args).await
     }
 
     #[doc = include_str!("../instructions/tools/manifest_dependencies.md")]

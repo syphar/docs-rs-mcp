@@ -15,7 +15,7 @@ hosting an extended version of it.
 
 ## What it gives you
 
-Thirteen tools, all answering specific natural-language questions:
+Couple of tools, all answering specific natural-language questions:
 
 | Tool | Answers |
 |---|---|
@@ -28,6 +28,7 @@ Thirteen tools, all answering specific natural-language questions:
 | `list_implementors` | *"what implements this trait?"* |
 | `inspect_feature_flags` | *"what features does X have?"*, *"how do I enable Y?"* |
 | `crate_metadata` | *"what is this crate?"*, *"MSRV / license / repo?"* |
+| `crate_overview` | *"orient me to this crate"* |
 | `manifest_dependencies` | *"what dependencies does X declare?"* |
 | `changelog` | *"what changed in version X?"*, *"any breaking changes?"* |
 | `find_examples` | *"show me a working example"* |
@@ -132,7 +133,7 @@ The bundled tool descriptions and server-level `instructions` already cover
 the typical flow:
 
 ```
-resolve_version → search_items / list_module → get_item / list_methods / list_impls
+resolve_version → crate_overview / search_items / list_module → get_item / list_methods / list_impls
 ```
 
 A few hard rules baked into the descriptions:

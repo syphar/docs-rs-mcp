@@ -3,6 +3,7 @@ use serde::Serialize;
 
 pub(crate) mod changelog;
 pub(crate) mod crate_metadata;
+pub(crate) mod crate_overview;
 pub(crate) mod find_examples;
 pub(crate) mod get_item;
 pub(crate) mod inspect_feature_flags;
