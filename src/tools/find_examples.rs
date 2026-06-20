@@ -15,6 +15,16 @@ pub(crate) struct FindExamplesArgs {
     /// to `false` — returns just the file paths and names.
     #[serde(default)]
     pub(crate) include_content: bool,
+    /// Return only the named example.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) name: Option<String>,
+    /// Maximum characters of source returned per example. Defaults to 20,000.
+    #[serde(default = "default_max_chars")]
+    pub(crate) max_chars: usize,
+}
+
+fn default_max_chars() -> usize {
+    20_000
 }
 
 #[derive(Debug, Serialize)]
@@ -29,6 +39,8 @@ struct FindExamplesResult {
         krate = %args.krate,
         version = %args.version.as_ref(),
         include_content = args.include_content,
+        name = args.name.as_deref(),
+        max_chars = args.max_chars,
     ),
 )]
 pub(crate) async fn handle(
@@ -40,6 +52,8 @@ pub(crate) async fn handle(
         &args.krate,
         args.version.as_ref(),
         args.include_content,
+        args.name.as_deref(),
+        args.max_chars,
     )
     .await?;
 
