@@ -17,6 +17,39 @@ pub(crate) struct ResolveVersionArgs {
     pub(crate) req: VersionReq,
 }
 
+#[tracing::instrument(
+    name = "tool.resolve_version",
+    skip(context),
+    fields(krate = %args.krate, req = %args.req.as_ref()),
+)]
+pub(crate) async fn handle(
+    context: &Context,
+    args: ResolveVersionArgs,
+) -> Result<CallToolResult, McpError> {
+    let status = context
+        .resolver_cache
+        .entry((args.krate.clone(), args.req.clone().into()))
+        .or_try_insert_with::<_, anyhow::Error>(async move {
+            Ok(Arc::new(
+                get_docs_status(context, &args.krate, args.req.as_ref()).await?,
+            ))
+        })
+        .await;
+
+    if let Some(status) = status
+        .map_err(|err| McpError::internal_error(err.to_string(), None))?
+        .into_value()
+        .as_ref()
+    {
+        Ok(render_response(status)?)
+    } else {
+        Err(McpError::resource_not_found(
+            "crate or version not found",
+            None,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,38 +109,5 @@ mod tests {
             Some(serde_json::to_value(tokio)?)
         );
         Ok(())
-    }
-}
-
-#[tracing::instrument(
-    name = "tool.resolve_version",
-    skip(context),
-    fields(krate = %args.krate, req = %args.req.as_ref()),
-)]
-pub(crate) async fn handle(
-    context: &Context,
-    args: ResolveVersionArgs,
-) -> Result<CallToolResult, McpError> {
-    let status = context
-        .resolver_cache
-        .entry((args.krate.clone(), args.req.clone().into()))
-        .or_try_insert_with::<_, anyhow::Error>(async move {
-            Ok(Arc::new(
-                get_docs_status(context, &args.krate, args.req.as_ref()).await?,
-            ))
-        })
-        .await;
-
-    if let Some(status) = status
-        .map_err(|err| McpError::internal_error(err.to_string(), None))?
-        .into_value()
-        .as_ref()
-    {
-        Ok(render_response(status)?)
-    } else {
-        Err(McpError::resource_not_found(
-            "crate or version not found",
-            None,
-        ))
     }
 }
