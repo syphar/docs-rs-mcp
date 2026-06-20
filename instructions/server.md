@@ -2,7 +2,7 @@ MCP server exposing Rust crate documentation from docs.rs rustdoc JSON.
 
 Typical flow:
 1. `resolve_version(krate, req)` to turn a semver requirement (or `*`) into a concrete version. All other tools take an exact version.
-2. Discover paths with `search_items` (search by name/path/alias, filtered by kind) or `list_module` (enumerate one module's children).
+2. For an unfamiliar crate, call `crate_overview`; otherwise discover paths with `search_items` (search by name/path/alias, filtered by kind) or `list_module` (enumerate one module's children).
 3. Drill in:
    - `get_item(path)` — full record for one item: signature, docs, examples.
    - `list_methods(type_path)` — methods on a struct/enum/union.
@@ -21,6 +21,7 @@ Match the tool to the question:
    - "show me X's signature/docs/examples" → `get_item`.
    - "what features does X have" / "how do I enable X" → `inspect_feature_flags`.
    - "what is this crate" / "MSRV / license / repo" → `crate_metadata`.
+   - broad orientation for an unfamiliar crate → `crate_overview`.
    - "what dependencies does X declare" → `manifest_dependencies`.
    - "what changed in X" / "any breaking changes" → `changelog`.
    - "what API changed between X and Y" / migration planning → `compare_versions`, then inspect changed items and changelog sections.
