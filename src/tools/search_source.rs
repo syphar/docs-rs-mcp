@@ -18,7 +18,7 @@ pub(crate) struct SearchSourceArgs {
 }
 
 fn default_glob() -> String {
-    "**/*.rs".into()
+    "*.rs".into()
 }
 
 fn default_limit() -> usize {
@@ -44,7 +44,7 @@ pub(crate) async fn handle(
         args.version.as_ref(),
         &args.query,
         &args.path_glob,
-        args.limit.min(100),
+        args.limit.clamp(1, 100),
         args.context_lines.min(5),
     )
     .await?;

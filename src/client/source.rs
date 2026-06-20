@@ -168,6 +168,8 @@ mod tests {
     #[test]
     fn glob_supports_recursive_rust_patterns() {
         assert!(glob_matches("**/*.rs", "src/client/source.rs"));
+        assert!(glob_matches("*.rs", "lib.rs"));
+        assert!(glob_matches("*.rs", "src/lib.rs"));
         assert!(!glob_matches("**/*.rs", "README.md"));
     }
 

@@ -30,9 +30,24 @@ pub(crate) async fn inspect_feature_flags(
     version: &semver::Version,
 ) -> Result<Vec<Feature>, Error> {
     let manifest = fetch_cargo_manifest(context, krate, version).await?;
-    let Some(features) = manifest.features.clone() else {
+    let mut features = manifest.features.clone().unwrap_or_default();
+    let optional_dependencies = optional_dependency_features(&manifest);
+    let explicitly_suppressed: HashSet<_> = features
+        .values()
+        .flatten()
+        .filter_map(|entry| entry.strip_prefix("dep:"))
+        .map(str::to_string)
+        .collect();
+    for dependency in optional_dependencies {
+        if !explicitly_suppressed.contains(&dependency) {
+            features
+                .entry(dependency.clone())
+                .or_insert_with(|| vec![format!("dep:{dependency}")]);
+        }
+    }
+    if features.is_empty() {
         return Ok(Vec::new());
-    };
+    }
 
     let defaults = features.get("default").cloned().unwrap_or_default();
     let default_closure = feature_closure("default", &features);
@@ -112,6 +127,25 @@ fn optional_dependency_name(entry: &str) -> Option<String> {
     }
     let (dependency, _) = entry.split_once('/')?;
     Some(dependency.trim_end_matches('?').to_string())
+}
+
+fn optional_dependency_features(manifest: &cargo_manifest::Manifest) -> BTreeSet<String> {
+    manifest
+        .dependencies
+        .iter()
+        .flat_map(|dependencies| dependencies.iter())
+        .filter_map(|(name, dependency)| match dependency {
+            cargo_manifest::Dependency::Detailed(detail) if detail.optional.unwrap_or(false) => {
+                Some(name.clone())
+            }
+            cargo_manifest::Dependency::Inherited(inherited)
+                if inherited.optional.unwrap_or(false) =>
+            {
+                Some(name.clone())
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 #[cfg(test)]
