@@ -142,7 +142,7 @@ pub(crate) async fn compare_versions(
 fn api_snapshot(docs: &rustdoc_types::Crate) -> Result<BTreeMap<String, ApiSnapshot>, Error> {
     docs.index
         .values()
-        .filter(|item| !matches!(item.inner, ItemEnum::Use(_)))
+        .filter(|item| item.crate_id == 0 && !matches!(item.inner, ItemEnum::Use(_)))
         .filter_map(|item| {
             let path = docs.paths.get(&item.id)?.path.join("::");
             Some((path, item))
@@ -251,6 +251,84 @@ mod tests {
         assert!(comparison.signatures_changed.is_empty());
         assert!(comparison.features_changed.is_empty());
         assert!(comparison.dependencies_changed.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn compares_axum_0_8_8_to_0_8_9() -> Result<()> {
+        let mut env = test_env().await?;
+        let from = semver::Version::new(0, 8, 8);
+        let to = semver::Version::new(0, 8, 9);
+
+        let _from_docs = env
+            .server
+            .mock("GET", "/crate/axum/0.8.8/test-target/json.zst")
+            .with_status(200)
+            .with_body_from_file(fixture("axum_0.8.8.json.zst")?)
+            .create();
+        let _to_docs = env
+            .server
+            .mock("GET", "/crate/axum/0.8.9/test-target/json.zst")
+            .with_status(200)
+            .with_body_from_file(fixture("axum_0.8.9.json.zst")?)
+            .create();
+        let _from_source = env
+            .server
+            .mock("GET", "/crates/axum/axum-0.8.8.crate")
+            .with_status(200)
+            .with_body_from_file(fixture("axum-0.8.8.crate")?)
+            .create();
+        let _to_source = env
+            .server
+            .mock("GET", "/crates/axum/axum-0.8.9.crate")
+            .with_status(200)
+            .with_body_from_file(fixture("axum-0.8.9.crate")?)
+            .create();
+
+        let (comparison, from_docs, to_docs) =
+            compare_versions(env.context(), "axum", &from, &to, "test-target").await?;
+
+        assert_eq!(comparison.msrv_before.as_deref(), Some("1.78"));
+        assert_eq!(comparison.msrv_after.as_deref(), Some("1.80"));
+        assert!(comparison.items_added.is_empty());
+        assert!(comparison.items_removed.is_empty());
+        assert!(comparison.features_changed.is_empty());
+        assert!(
+            comparison
+                .signatures_changed
+                .iter()
+                .all(|change| change.path == "axum" || change.path.starts_with("axum::")),
+            "non-axum changes: {:?}",
+            comparison
+                .signatures_changed
+                .iter()
+                .filter(|change| change.path != "axum" && !change.path.starts_with("axum::"))
+                .map(|change| &change.path)
+                .take(10)
+                .collect::<Vec<_>>()
+        );
+
+        let macros = comparison
+            .dependencies_changed
+            .iter()
+            .find(|change| change.key == "axum-macros:Normal:")
+            .expect("axum-macros dependency changed");
+        assert_eq!(
+            macros
+                .before
+                .as_ref()
+                .and_then(|value| value["req"].as_str()),
+            Some("0.5.0")
+        );
+        assert_eq!(
+            macros
+                .after
+                .as_ref()
+                .and_then(|value| value["req"].as_str()),
+            Some("0.5.1")
+        );
+        assert!(!from_docs.target_fallback);
+        assert!(!to_docs.target_fallback);
         Ok(())
     }
 }
