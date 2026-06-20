@@ -34,6 +34,10 @@ pub(crate) struct ItemRecord {
     /// Compact Rust-like rendering for common public item kinds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) signature: Option<String>,
+    /// Exact declaration text sliced from the published source using the
+    /// rustdoc span. Omitted when source or span data is unavailable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) source_signature: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) deprecation: Option<rustdoc_types::Deprecation>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -78,6 +82,7 @@ pub(crate) fn get_item(
         kind: item.inner.item_kind().into(),
         inner: item.inner.clone(),
         signature: render_item_signature(item.name.as_deref(), &item.inner),
+        source_signature: None,
         deprecation: item.deprecation.clone(),
         span: item.span.clone(),
         attrs: item.attrs.clone(),

@@ -2,6 +2,7 @@ use crate::{
     client::{
         get_docs::{TargetResolution, get_docs},
         get_item::{self, Verbosity},
+        source,
     },
     context::Context,
     errors::Error,
@@ -66,8 +67,15 @@ pub(crate) async fn handle(
 
     let path: Vec<&str> = args.path.split("::").collect();
 
-    let record = get_item::get_item(&docs, &path, args.verbosity)
+    let mut record = get_item::get_item(&docs, &path, args.verbosity)
         .ok_or_else(|| Error::item_not_found(path))?;
+    if let Some(span) = record.span.as_ref() {
+        record.source_signature =
+            source::source_signature(context, &args.krate, args.version.as_ref(), span)
+                .await
+                .ok()
+                .flatten();
+    }
 
     render_response(GetItemResult {
         target: docs.target_resolution(),

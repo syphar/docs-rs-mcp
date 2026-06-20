@@ -5,6 +5,7 @@ Return the full record for a single item by its fully-qualified path. Requires a
 The response includes target-resolution metadata plus an `item` containing:
   - `kind`, `name`, `path`, `id`
   - `signature`: compact Rust-like rendering for common item kinds
+  - `source_signature`: exact declaration text extracted from the published source using rustdoc's span, when available
   - `inner`: structured rustdoc info (generics, where-clauses, fields/variants/function decl, etc.); shape varies by `kind`
   - `deprecation`, `span`, `attrs`
 

@@ -23,6 +23,26 @@ pub(crate) struct SourceFile {
     pub(crate) content_truncated: bool,
 }
 
+pub(crate) async fn source_signature(
+    context: &Context,
+    krate: &str,
+    version: &semver::Version,
+    span: &rustdoc_types::Span,
+) -> Result<Option<String>, Error> {
+    let root = fetch_source(context, krate, version).await?;
+    let relative = safe_relative_path(
+        span.filename
+            .to_str()
+            .ok_or_else(|| Error::ResourceNotFound("non-UTF-8 source span path".into()))?,
+    )?;
+    let path = root.join(relative);
+    let content = tokio::fs::read_to_string(path).await?;
+    let Some(source) = slice_span(&content, span.begin, span.end) else {
+        return Ok(None);
+    };
+    Ok(Some(declaration_prefix(&source)))
+}
+
 pub(crate) async fn search_source(
     context: &Context,
     krate: &str,
@@ -129,6 +149,58 @@ fn safe_relative_path(path: &str) -> Result<PathBuf, Error> {
     Ok(path.to_path_buf())
 }
 
+fn slice_span(content: &str, begin: (usize, usize), end: (usize, usize)) -> Option<String> {
+    let lines: Vec<_> = content.lines().collect();
+    let (begin_line, begin_column) = begin;
+    let (end_line, end_column) = end;
+    if begin_line == 0 || begin_column == 0 || end_line < begin_line || end_line > lines.len() {
+        return None;
+    }
+
+    let mut selected = Vec::new();
+    for line_number in begin_line..=end_line {
+        let line = lines.get(line_number - 1)?;
+        let chars: Vec<_> = line.chars().collect();
+        let start = if line_number == begin_line {
+            begin_column.saturating_sub(1)
+        } else {
+            0
+        };
+        let finish = if line_number == end_line {
+            end_column.saturating_sub(1).min(chars.len())
+        } else {
+            chars.len()
+        };
+        if start > finish || start > chars.len() {
+            return None;
+        }
+        selected.push(chars[start..finish].iter().collect::<String>());
+    }
+    Some(selected.join("\n"))
+}
+
+fn declaration_prefix(source: &str) -> String {
+    let mut parens = 0usize;
+    let mut brackets = 0usize;
+    let mut angles = 0usize;
+
+    for (index, ch) in source.char_indices() {
+        match ch {
+            '(' => parens += 1,
+            ')' => parens = parens.saturating_sub(1),
+            '[' => brackets += 1,
+            ']' => brackets = brackets.saturating_sub(1),
+            '<' => angles += 1,
+            '>' => angles = angles.saturating_sub(1),
+            '{' if parens == 0 && brackets == 0 && angles == 0 => {
+                return source[..index].trim_end().to_string();
+            }
+            _ => {}
+        }
+    }
+    source.trim().to_string()
+}
+
 fn glob_matches(pattern: &str, text: &str) -> bool {
     let pattern: Vec<char> = pattern.chars().collect();
     let text: Vec<char> = text.chars().collect();
@@ -164,6 +236,11 @@ fn glob_matches(pattern: &str, text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        client::get_item::{Verbosity, get_item},
+        test_utils::{docs_fixture, fixture, test_env},
+    };
+    use anyhow::Result;
 
     #[test]
     fn glob_supports_recursive_rust_patterns() {
@@ -177,5 +254,43 @@ mod tests {
     fn rejects_parent_paths() {
         assert!(safe_relative_path("../Cargo.toml").is_err());
         assert!(safe_relative_path("src/lib.rs").is_ok());
+    }
+
+    #[test]
+    fn extracts_multiline_source_signature() {
+        let source = "fn before() {}\n\npub async fn serve<M>(\n    listener: TcpListener,\n    make_service: M,\n) -> Serve<M>\nwhere\n    M: Service,\n{\n    Serve::new(listener, make_service)\n}\n";
+        let span = slice_span(source, (3, 1), (11, 2)).unwrap();
+        assert_eq!(
+            declaration_prefix(&span),
+            "pub async fn serve<M>(\n    listener: TcpListener,\n    make_service: M,\n) -> Serve<M>\nwhere\n    M: Service,"
+        );
+    }
+
+    #[tokio::test]
+    async fn extracts_signature_from_published_span() -> Result<()> {
+        let mut env = test_env().await?;
+        let version = semver::Version::new(0, 8, 9);
+        let fixture = fixture("axum-0.8.9.crate")?;
+        let _mock = env
+            .server
+            .mock("GET", "/crates/axum/axum-0.8.9.crate")
+            .with_status(200)
+            .with_body_from_file(fixture)
+            .create();
+        let docs = docs_fixture("axum_0.8.9.json.zst").await?;
+        let item = get_item(&docs, &["axum", "serve", "serve"], Verbosity::Signature).unwrap();
+        let span = item.span.as_ref().unwrap();
+
+        let signature = source_signature(env.context(), "axum", &version, span)
+            .await?
+            .unwrap();
+
+        assert!(
+            signature.starts_with("pub fn serve<"),
+            "unexpected signature: {signature}"
+        );
+        assert!(signature.contains("Listener"));
+        assert!(!signature.contains("Serve::new"));
+        Ok(())
     }
 }
