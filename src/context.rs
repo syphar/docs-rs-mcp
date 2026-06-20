@@ -18,7 +18,7 @@ pub(crate) struct DocsKey {
 
 pub(crate) struct Context {
     config: Config,
-    pub(crate) resolver_cache: Cache<semver::VersionReq, Arc<Option<Status>>>,
+    pub(crate) resolver_cache: Cache<(String, semver::VersionReq), Arc<Option<Status>>>,
     pub(crate) rustdoc_json_cache: Cache<DocsKey, Arc<rustdoc_types::Crate>>,
     pub(crate) cargo_manifest_cache: Cache<DocsKey, Arc<cargo_manifest::Manifest>>,
 }

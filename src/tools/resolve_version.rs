@@ -28,7 +28,7 @@ pub(crate) async fn handle(
 ) -> Result<CallToolResult, McpError> {
     let status = context
         .resolver_cache
-        .entry(args.req.clone().into())
+        .entry((args.krate.clone(), args.req.clone().into()))
         .or_try_insert_with::<_, anyhow::Error>(async move {
             Ok(Arc::new(
                 get_docs_status(context, &args.krate, args.req.as_ref()).await?,
