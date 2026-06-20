@@ -11,6 +11,7 @@ pub(crate) mod list_implementors;
 pub(crate) mod list_impls;
 pub(crate) mod list_methods;
 pub(crate) mod list_module;
+pub(crate) mod list_versions;
 pub(crate) mod manifest_dependencies;
 pub(crate) mod read_source_file;
 pub(crate) mod readme;

@@ -12,6 +12,7 @@ Typical flow:
 
 Match the tool to the question:
    - any version question or non-exact version ("latest of X", "X 0.8", "X ^1.0", "does X 1.2 exist", "is docs.rs ready") → `resolve_version` (pass the requirement as `req`; use `req="*"` for latest). NEVER pass anything other than a fully-specified `MAJOR.MINOR.PATCH` as `version` to any other tool — `"*"`, `"0.8"`, `"^1.0"`, `"~1.2"`, ranges, etc. are invalid; resolve them through `resolve_version` first.
+   - "show release history" / "which versions are yanked" → `list_versions`.
    - "what methods does X have" / "how do I use X" → `list_methods`.
    - "which traits does X implement" / "is X Send/Sync/..." → `list_impls`.
    - "what implements this trait" / "which types are X" → `list_implementors`.

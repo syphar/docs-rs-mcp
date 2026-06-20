@@ -11,6 +11,7 @@ use crate::{
         list_impls::{self, ListImplsArgs},
         list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
+        list_versions::{self, ListVersionsArgs},
         manifest_dependencies::{self, ManifestDependenciesArgs},
         read_source_file::{self, ReadSourceFileArgs},
         readme::{self, ReadmeArgs},
@@ -66,6 +67,15 @@ impl DocsServer {
         Parameters(args): Parameters<ListModuleArgs>,
     ) -> Result<CallToolResult, McpError> {
         list_module::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/list_versions.md")]
+    #[tool]
+    async fn list_versions(
+        &self,
+        Parameters(args): Parameters<ListVersionsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        list_versions::handle(&self.config, args).await
     }
 
     #[doc = include_str!("../instructions/tools/get_item.md")]

@@ -89,6 +89,14 @@ pub(crate) struct Config {
     )]
     pub(crate) static_crates_io: Url,
 
+    /// Base URL of the crates.io API.
+    #[arg(
+        long,
+        value_name = "URL",
+        default_value_t = Url::parse("https://crates.io").unwrap()
+    )]
+    pub(crate) crates_io_server: Url,
+
     /// How long (in seconds) to cache version resolution results.
     #[arg(
         long,
@@ -111,6 +119,7 @@ impl fmt::Debug for Config {
             .field("log_dir", &self.log_dir.display())
             .field("docs_rs_server", &self.docs_rs_server.to_string())
             .field("static_crates_io", &self.static_crates_io.to_string())
+            .field("crates_io_server", &self.crates_io_server.to_string())
             .field("resolver_cache_ttl", &self.resolver_cache_ttl.as_secs())
             .field(
                 "opentelemetry_grpc_endpoint",

@@ -32,6 +32,7 @@ pub(crate) async fn test_env() -> Result<TestEnv> {
         log_dir: cache_dir.path().join("logs"),
         docs_rs_server: server_url.clone(),
         static_crates_io: server_url.clone(),
+        crates_io_server: server_url.clone(),
         resolver_cache_ttl: Duration::from_secs(0),
         opentelemetry_grpc_endpoint: None,
     };

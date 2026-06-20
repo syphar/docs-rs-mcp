@@ -15,11 +15,12 @@ hosting an extended version of it.
 
 ## What it gives you
 
-Sixteen tools, all answering specific natural-language questions:
+Seventeen tools, all answering specific natural-language questions:
 
 | Tool | Answers |
 |---|---|
 | `resolve_version` | *"what's the latest version of X?"*, *"does version Y exist?"* |
+| `list_versions` | *"what releases exist?"*, *"which are yanked?"* |
 | `search_items` | *"find X"*, *"is there a Y in this crate?"* |
 | `list_module` | *"what's in module X?"*, *"what does X re-export?"* |
 | `get_item` | *"show me X's signature/docs/examples"* |

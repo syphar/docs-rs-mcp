@@ -16,6 +16,7 @@ pub(crate) mod render;
 pub(crate) mod search_items;
 pub(crate) mod source;
 pub(crate) mod status;
+pub(crate) mod versions;
 
 use crate::errors::Error;
 use anyhow::Result;
