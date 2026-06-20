@@ -28,7 +28,7 @@ Twelve tools, all answering specific natural-language questions:
 | `list_implementors` | *"what implements this trait?"* |
 | `inspect_feature_flags` | *"what features does X have?"*, *"how do I enable Y?"* |
 | `crate_metadata` | *"what is this crate?"*, *"MSRV / license / repo?"* |
-| `dependency_tree` | *"what does X depend on?"* |
+| `manifest_dependencies` | *"what dependencies does X declare?"* |
 | `changelog` | *"what changed in version X?"*, *"any breaking changes?"* |
 | `find_examples` | *"show me a working example"* |
 

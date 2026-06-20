@@ -39,7 +39,7 @@ pub(crate) struct Dependency {
 /// One-level dep list (not a recursive tree — that would need fetching every
 /// transitive crate). For each direct dep returns kind + version req + the
 /// flags that affect its build.
-pub(crate) async fn dependency_tree(
+pub(crate) async fn manifest_dependencies(
     context: &Context,
     krate: &str,
     version: &semver::Version,
@@ -155,7 +155,7 @@ mod tests {
             .with_body_from_file(&fixture)
             .create();
 
-        let deps = dependency_tree(env.context(), "axum", &version).await?;
+        let deps = manifest_dependencies(env.context(), "axum", &version).await?;
 
         let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
         assert!(names.iter().any(|n| n.contains("axum-core")));

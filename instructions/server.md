@@ -20,7 +20,7 @@ Match the tool to the question:
    - "show me X's signature/docs/examples" → `get_item`.
    - "what features does X have" / "how do I enable X" → `inspect_feature_flags`.
    - "what is this crate" / "MSRV / license / repo" → `crate_metadata`.
-   - "what does X depend on" → `dependency_tree`.
+   - "what dependencies does X declare" → `manifest_dependencies`.
    - "what changed in X" / "any breaking changes" → `changelog`.
    - "show me the README" / "how does this crate say to get started?" → `readme`.
    - "show me a working example" → `find_examples` first, fall back to `get_item` doctests.

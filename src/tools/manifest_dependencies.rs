@@ -1,11 +1,11 @@
 use crate::{
-    client::dependency_tree, context::Context, tools::render_response, types::semver::Version,
+    client::manifest_dependencies, context::Context, tools::render_response, types::semver::Version,
 };
 use rmcp::{ErrorData as McpError, model::CallToolResult, schemars};
 use serde::Serialize;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-pub(crate) struct DependencyTreeArgs {
+pub(crate) struct ManifestDependenciesArgs {
     /// Name of the crate on crates.io.
     pub(crate) krate: String,
     /// Exact crate version. Use `resolve_version` first if you only have a
@@ -14,21 +14,22 @@ pub(crate) struct DependencyTreeArgs {
 }
 
 #[derive(Debug, Serialize)]
-struct DependencyTreeResult {
-    dependencies: Vec<dependency_tree::Dependency>,
+struct ManifestDependenciesResult {
+    dependencies: Vec<manifest_dependencies::Dependency>,
 }
 
 #[tracing::instrument(
-    name = "tool.dependency_tree",
+    name = "tool.manifest_dependencies",
     skip(context),
     fields(krate = %args.krate, version = %args.version.as_ref()),
 )]
 pub(crate) async fn handle(
     context: &Context,
-    args: DependencyTreeArgs,
+    args: ManifestDependenciesArgs,
 ) -> Result<CallToolResult, McpError> {
     let dependencies =
-        dependency_tree::dependency_tree(context, &args.krate, args.version.as_ref()).await?;
+        manifest_dependencies::manifest_dependencies(context, &args.krate, args.version.as_ref())
+            .await?;
 
-    render_response(DependencyTreeResult { dependencies })
+    render_response(ManifestDependenciesResult { dependencies })
 }

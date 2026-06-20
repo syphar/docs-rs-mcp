@@ -3,7 +3,6 @@ use crate::{
     tools::{
         changelog::{self, ChangelogArgs},
         crate_metadata::{self, CrateMetadataArgs},
-        dependency_tree::{self, DependencyTreeArgs},
         find_examples::{self, FindExamplesArgs},
         get_item::{self, GetItemArgs},
         inspect_feature_flags::{self, InspectFeatureFlagsArgs},
@@ -11,6 +10,7 @@ use crate::{
         list_impls::{self, ListImplsArgs},
         list_methods::{self, ListMethodsArgs},
         list_module::{self, ListModuleArgs},
+        manifest_dependencies::{self, ManifestDependenciesArgs},
         readme::{self, ReadmeArgs},
         resolve_version::{self, ResolveVersionArgs},
         search_items::{self, SearchItemsArgs},
@@ -119,13 +119,13 @@ impl DocsServer {
         crate_metadata::handle(&self.config, args).await
     }
 
-    #[doc = include_str!("../instructions/tools/dependency_tree.md")]
+    #[doc = include_str!("../instructions/tools/manifest_dependencies.md")]
     #[tool]
-    async fn dependency_tree(
+    async fn manifest_dependencies(
         &self,
-        Parameters(args): Parameters<DependencyTreeArgs>,
+        Parameters(args): Parameters<ManifestDependenciesArgs>,
     ) -> Result<CallToolResult, McpError> {
-        dependency_tree::handle(&self.config, args).await
+        manifest_dependencies::handle(&self.config, args).await
     }
 
     #[doc = include_str!("../instructions/tools/changelog.md")]
