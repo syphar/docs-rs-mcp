@@ -1,4 +1,7 @@
-use crate::{client::get_item::resolve_item, types::rustdoc_types::ItemKind};
+use crate::{
+    client::{get_item::resolve_item, render::render_item_signature},
+    types::rustdoc_types::ItemKind,
+};
 use rustdoc_types::{ItemEnum, Type};
 use serde::Serialize;
 
@@ -9,6 +12,7 @@ pub(crate) struct Method {
     /// Structured rustdoc representation of the method — `ItemEnum::Function`
     /// carrying generics, decl (args + output), header (async/const/unsafe/abi).
     pub(crate) signature: ItemEnum,
+    pub(crate) rendered_signature: String,
     /// `Some(trait_path)` when the method comes from a trait impl
     /// (e.g. `"core::clone::Clone"`); `None` for inherent methods.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,6 +60,8 @@ pub(crate) fn list_methods(docs: &rustdoc_types::Crate, type_path: &[&str]) -> O
                 name,
                 kind: method.inner.item_kind().into(),
                 signature: method.inner.clone(),
+                rendered_signature: render_item_signature(method.name.as_deref(), &method.inner)
+                    .unwrap_or_default(),
                 via_trait: via_trait.clone(),
                 summary: summary_of(method),
                 deprecated: method.deprecation.is_some(),
@@ -105,6 +111,12 @@ mod tests {
         assert!(by_name("route").is_some(), "Router::route exists");
         assert!(by_name("nest").is_some(), "Router::nest exists");
         assert!(by_name("with_state").is_some(), "Router::with_state exists");
+        assert!(
+            by_name("route")
+                .unwrap()
+                .rendered_signature
+                .starts_with("pub fn route")
+        );
 
         // Inherent methods have no via_trait.
         assert!(by_name("new").unwrap().via_trait.is_none());

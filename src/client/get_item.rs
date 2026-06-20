@@ -1,4 +1,4 @@
-use crate::types::rustdoc_types::ItemKind;
+use crate::{client::render::render_item_signature, types::rustdoc_types::ItemKind};
 use rmcp::schemars;
 use rustdoc_types::{Id, ItemEnum};
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,9 @@ pub(crate) struct ItemRecord {
     /// fields, variants, function decl, etc. Shape varies by `kind`; see the
     /// `rustdoc_types::ItemEnum` variants for the full schema.
     pub(crate) inner: rustdoc_types::ItemEnum,
+    /// Compact Rust-like rendering for common public item kinds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) signature: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) deprecation: Option<rustdoc_types::Deprecation>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,6 +77,7 @@ pub(crate) fn get_item(
         path: canonical_path,
         kind: item.inner.item_kind().into(),
         inner: item.inner.clone(),
+        signature: render_item_signature(item.name.as_deref(), &item.inner),
         deprecation: item.deprecation.clone(),
         span: item.span.clone(),
         attrs: item.attrs.clone(),
@@ -227,6 +231,7 @@ mod tests {
         let item = get_item(&docs, &path, Verbosity::Signature).expect("Router exists");
         assert_eq!(item.kind, ItemKind::Struct);
         assert_eq!(item.path, "axum::routing::Router");
+        assert_eq!(item.signature.as_deref(), Some("pub struct Router"));
         assert!(item.docs.is_none(), "signature verbosity skips docs");
 
         Ok(())

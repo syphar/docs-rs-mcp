@@ -11,6 +11,7 @@ pub(crate) mod list_methods;
 pub(crate) mod list_module;
 pub(crate) mod manifest_dependencies;
 pub(crate) mod readme;
+pub(crate) mod render;
 pub(crate) mod search_items;
 pub(crate) mod status;
 

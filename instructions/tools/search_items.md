@@ -7,7 +7,9 @@ Override via the `target` arg when the user's project targets something differen
 
 If docs.rs has no build for the requested `target` (most crates only opt into one target), the server falls back to the *crate's* default target — whichever target the crate author marked as default in their docs.rs metadata. Responses report `requested_target`, `resolved_target`, and `target_fallback`. When fallback is true, the concrete default target is unknown and `resolved_target` is omitted. Cfg-gated items may then be missing or extra — verify against the user's actual target if precision matters.
 
-Each result has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), `kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via `#[doc(alias = "...")]`; the query also matches against these), and optionally `reexport`.
+Results are ranked by exact name/final-segment match, prefix match, alias match, then substring match. Use `offset` and `limit` for pagination. The response includes `total_matches` and `truncated`.
+
+Each item has: `id`, `name`, `path` (import path the user writes, e.g. `axum::Router`), `kind` (`struct`, `trait`, `function`, ...), `aliases` (values declared via `#[doc(alias = "...")]`; the query also matches against these), and optionally `reexport`.
 
 Re-exports (`pub use ...`) are first-class. The same item may appear at multiple paths: its canonical definition and every `pub use` that re-exports it. Each path is independently importable. There is no automatic dedup — if you want one entry per item, dedup on `id`.
 

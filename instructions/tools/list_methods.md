@@ -7,6 +7,7 @@ Mechanism: walks every `impl` block in the crate whose `for_` resolves to `type_
 Each result has:
   - `name`: method name
   - `kind`: typically `function`
+  - `rendered_signature`: compact Rust-like method signature
   - `signature`: structured `ItemEnum::Function` (generics, decl, header)
   - `via_trait`: path of the trait (e.g. `"core::clone::Clone"`) when the method comes from a trait impl, omitted for inherent methods
   - `summary`: first paragraph of the method's doc comment
@@ -16,6 +17,8 @@ Limitations:
   - Blanket impls (`impl<T: Trait> Foo for T`) are skipped — `for_` isn't a concrete type.
   - Default trait methods that the impl doesn't override aren't repeated here. Call `get_item` on the trait if you need them.
   - Only function-shaped items are returned (no associated consts/types).
+
+Use `query`, `inherent_only`, `trait_path`, `include_deprecated`, and `limit` to keep large method sets focused. The response includes `total_matches` and `truncated`.
 
 Related: `list_impls` returns the traits a type implements (no method bodies). `list_implementors` is the inverse — types that implement a given trait.
 

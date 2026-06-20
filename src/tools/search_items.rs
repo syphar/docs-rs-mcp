@@ -40,6 +40,9 @@ pub(crate) struct SearchItemsArgs {
     /// Maximum number of matches to return. Defaults to 20.
     #[serde(default = "default_limit")]
     pub(crate) limit: usize,
+    /// Number of ranked matches to skip. Defaults to 0.
+    #[serde(default)]
+    pub(crate) offset: usize,
     /// Target triple to fetch docs for (e.g. `"x86_64-unknown-linux-gnu"`,
     /// `"aarch64-apple-darwin"`, `"x86_64-pc-windows-msvc"`). Defaults to
     /// the host the server was compiled for — usually the user's machine.
@@ -71,6 +74,8 @@ struct SearchItemsResult {
     #[serde(flatten)]
     target: TargetResolution,
     items: Vec<search_items::Match>,
+    total_matches: usize,
+    truncated: bool,
     /// Glob re-exports (`pub use ...::*`) that pull from external crates
     /// the server didn't expand. To enumerate items reachable through these
     /// globs, call `search_items` again against `source_crate` /
@@ -88,6 +93,7 @@ struct SearchItemsResult {
         query = args.query.as_deref(),
         kind = ?args.kind,
         limit = args.limit,
+        offset = args.offset,
         target = args.target.as_deref(),
     ),
 )]
@@ -98,12 +104,21 @@ pub(crate) async fn handle(
     let target = args.target.as_deref().unwrap_or(HOST_TARGET);
     let docs = get_docs(context, &args.krate, args.version.as_ref(), Some(target)).await?;
 
-    let items = search_items::search(&docs, args.query.as_deref(), args.kind, Some(args.limit));
+    let all_items = search_items::search(&docs, args.query.as_deref(), args.kind, None);
+    let total_matches = all_items.len();
+    let items: Vec<_> = all_items
+        .into_iter()
+        .skip(args.offset)
+        .take(args.limit)
+        .collect();
+    let truncated = args.offset.saturating_add(items.len()) < total_matches;
     let unexpanded_external_globs = search_items::unexpanded_external_globs(&docs);
 
     render_response(SearchItemsResult {
         target: docs.target_resolution(),
         items,
+        total_matches,
+        truncated,
         unexpanded_external_globs,
     })
 }

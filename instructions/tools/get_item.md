@@ -4,7 +4,8 @@ Return the full record for a single item by its fully-qualified path. Requires a
 
 The response includes target-resolution metadata plus an `item` containing:
   - `kind`, `name`, `path`, `id`
-  - `inner`: structured rustdoc info (signature, generics, where-clauses, fields/variants/function decl, etc.); shape varies by `kind`
+  - `signature`: compact Rust-like rendering for common item kinds
+  - `inner`: structured rustdoc info (generics, where-clauses, fields/variants/function decl, etc.); shape varies by `kind`
   - `deprecation`, `span`, `attrs`
 
 `verbosity` controls how much detail to return (default `"full"`):

@@ -84,8 +84,9 @@ pub(crate) fn search(
     collect_reexports(docs, query_lower.as_deref(), kind_filter, &mut matches);
 
     matches.sort_by(|left, right| {
-        left.path
-            .cmp(&right.path)
+        rank_match(query_lower.as_deref(), left)
+            .cmp(&rank_match(query_lower.as_deref(), right))
+            .then_with(|| left.path.cmp(&right.path))
             .then_with(|| left.kind.cmp(&right.kind))
             .then_with(|| left.id.cmp(&right.id))
     });
@@ -95,6 +96,31 @@ pub(crate) fn search(
     }
 
     matches
+}
+
+fn rank_match(query: Option<&str>, item: &Match) -> u8 {
+    let Some(query) = query else { return 0 };
+    let name = item.name.to_lowercase();
+    let path = item.path.to_lowercase();
+    let final_segment = path.rsplit("::").next().unwrap_or(&path);
+
+    if name == query {
+        0
+    } else if final_segment == query {
+        1
+    } else if name.starts_with(query) {
+        2
+    } else if item
+        .aliases
+        .iter()
+        .any(|alias| alias.eq_ignore_ascii_case(query))
+    {
+        3
+    } else if name.contains(query) {
+        4
+    } else {
+        5
+    }
 }
 
 fn matches_query<I, S>(query: Option<&str>, name: &str, path: &str, aliases: I) -> bool
