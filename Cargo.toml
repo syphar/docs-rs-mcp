@@ -1,6 +1,6 @@
 [package]
 name = "docs-rs-mcp"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 edition = "2024"
 authors = ["Denis Cornehl <denis@cornehl.org>"]
 description = "MCP server exposing Rust crate documentation from docs.rs and crates.io to AI assistants."
