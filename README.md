@@ -15,7 +15,7 @@ hosting an extended version of it.
 
 ## What it gives you
 
-Thirteen tools, all answering specific natural-language questions:
+Fourteen tools, all answering specific natural-language questions:
 
 | Tool | Answers |
 |---|---|
@@ -30,6 +30,7 @@ Thirteen tools, all answering specific natural-language questions:
 | `crate_metadata` | *"what is this crate?"*, *"MSRV / license / repo?"* |
 | `manifest_dependencies` | *"what dependencies does X declare?"* |
 | `changelog` | *"what changed in version X?"*, *"any breaking changes?"* |
+| `compare_versions` | *"what changed between versions X and Y?"* |
 | `find_examples` | *"show me a working example"* |
 | `readme` | *"how does this crate say to get started?"* |
 

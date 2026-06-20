@@ -22,6 +22,7 @@ Match the tool to the question:
    - "what is this crate" / "MSRV / license / repo" → `crate_metadata`.
    - "what dependencies does X declare" → `manifest_dependencies`.
    - "what changed in X" / "any breaking changes" → `changelog`.
+   - "what API changed between X and Y" / migration planning → `compare_versions`, then inspect changed items and changelog sections.
    - "show me the README" / "how does this crate say to get started?" → `readme`.
    - "show me a working example" → `find_examples` first, fall back to `get_item` doctests.
 

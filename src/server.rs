@@ -2,6 +2,7 @@ use crate::{
     context::Context,
     tools::{
         changelog::{self, ChangelogArgs},
+        compare_versions::{self, CompareVersionsArgs},
         crate_metadata::{self, CrateMetadataArgs},
         find_examples::{self, FindExamplesArgs},
         get_item::{self, GetItemArgs},
@@ -135,6 +136,15 @@ impl DocsServer {
         Parameters(args): Parameters<ChangelogArgs>,
     ) -> Result<CallToolResult, McpError> {
         changelog::handle(&self.config, args).await
+    }
+
+    #[doc = include_str!("../instructions/tools/compare_versions.md")]
+    #[tool]
+    async fn compare_versions(
+        &self,
+        Parameters(args): Parameters<CompareVersionsArgs>,
+    ) -> Result<CallToolResult, McpError> {
+        compare_versions::handle(&self.config, args).await
     }
 
     #[doc = include_str!("../instructions/tools/find_examples.md")]

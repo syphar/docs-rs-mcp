@@ -1,4 +1,5 @@
 pub(crate) mod changelog;
+pub(crate) mod compare_versions;
 pub(crate) mod crate_metadata;
 pub(crate) mod find_examples;
 pub(crate) mod get_docs;
