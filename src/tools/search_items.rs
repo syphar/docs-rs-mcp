@@ -1,5 +1,8 @@
 use crate::{
-    client::{get_docs::get_docs, search_items},
+    client::{
+        get_docs::{TargetResolution, get_docs},
+        search_items,
+    },
     context::Context,
     tools::render_response,
     types::{rustdoc_types::ItemKind, semver::Version},
@@ -65,6 +68,8 @@ fn default_limit() -> usize {
 
 #[derive(Debug, Serialize)]
 struct SearchItemsResult {
+    #[serde(flatten)]
+    target: TargetResolution,
     items: Vec<search_items::Match>,
     /// Glob re-exports (`pub use ...::*`) that pull from external crates
     /// the server didn't expand. To enumerate items reachable through these
@@ -97,6 +102,7 @@ pub(crate) async fn handle(
     let unexpanded_external_globs = search_items::unexpanded_external_globs(&docs);
 
     render_response(SearchItemsResult {
+        target: docs.target_resolution(),
         items,
         unexpanded_external_globs,
     })

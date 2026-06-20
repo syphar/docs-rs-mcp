@@ -1,5 +1,8 @@
 use crate::{
-    client::{get_docs::get_docs, list_impls},
+    client::{
+        get_docs::{TargetResolution, get_docs},
+        list_impls,
+    },
     context::Context,
     tools::render_response,
     types::semver::Version,
@@ -29,6 +32,8 @@ pub(crate) struct ListImplsArgs {
 
 #[derive(Debug, Serialize)]
 struct ListImplsResult {
+    #[serde(flatten)]
+    target: TargetResolution,
     impls: Vec<list_impls::Impl>,
 }
 
@@ -58,5 +63,8 @@ pub(crate) async fn handle(
         )
     })?;
 
-    render_response(ListImplsResult { impls })
+    render_response(ListImplsResult {
+        target: docs.target_resolution(),
+        impls,
+    })
 }

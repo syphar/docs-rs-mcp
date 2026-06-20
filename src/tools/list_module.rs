@@ -1,5 +1,9 @@
 use crate::{
-    client::{get_docs::get_docs, list_module, search_items::UnexpandedExternalGlob},
+    client::{
+        get_docs::{TargetResolution, get_docs},
+        list_module,
+        search_items::UnexpandedExternalGlob,
+    },
     context::Context,
     tools::render_response,
     types::semver::Version,
@@ -33,6 +37,8 @@ pub(crate) struct ListModuleArgs {
 
 #[derive(Debug, Serialize)]
 struct ListModuleResult {
+    #[serde(flatten)]
+    target: TargetResolution,
     entries: Vec<list_module::Entry>,
     /// Glob re-exports at this module level that target external crates.
     /// Follow up by calling `list_module` (or `search_items`) against
@@ -67,6 +73,7 @@ pub(crate) async fn handle(
         .ok_or_else(|| McpError::resource_not_found("module not found at the given path", None))?;
 
     render_response(ListModuleResult {
+        target: docs.target_resolution(),
         entries: listing.entries,
         unexpanded_external_globs: listing.unexpanded_external_globs,
     })

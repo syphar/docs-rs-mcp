@@ -8,4 +8,4 @@ Each row has:
 
 `type_path` accepts canonical or re-export paths; the type must resolve to a struct/enum/union/primitive (those are the kinds rustdoc records direct impls on). Use `list_methods` if you want the method list instead of the trait list.
 
-Requires an exact `version` and uses the same `target` defaulting/fallback as other tools.
+Requires an exact `version` and reports the same target-resolution metadata as other rustdoc-backed tools.

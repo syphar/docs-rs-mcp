@@ -1,5 +1,8 @@
 use crate::{
-    client::{get_docs::get_docs, list_implementors},
+    client::{
+        get_docs::{TargetResolution, get_docs},
+        list_implementors,
+    },
     context::Context,
     tools::render_response,
     types::semver::Version,
@@ -30,6 +33,8 @@ pub(crate) struct ListImplementorsArgs {
 
 #[derive(Debug, Serialize)]
 struct ListImplementorsResult {
+    #[serde(flatten)]
+    target: TargetResolution,
     implementors: Vec<list_implementors::Implementor>,
 }
 
@@ -55,5 +60,8 @@ pub(crate) async fn handle(
     let implementors = list_implementors::list_implementors(&docs, &path)
         .ok_or_else(|| McpError::resource_not_found("no trait found at the given path", None))?;
 
-    render_response(ListImplementorsResult { implementors })
+    render_response(ListImplementorsResult {
+        target: docs.target_resolution(),
+        implementors,
+    })
 }
