@@ -1,9 +1,10 @@
 use crate::{client::get_source::fetch_cargo_manifest, context::Context, errors::Error};
 use anyhow::Result;
 use cargo_manifest::{Dependency as ManifestDep, DepsSet};
-use serde::Serialize;
+use rmcp::schemars;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum DependencyKind {
     Normal,
@@ -20,6 +21,22 @@ pub(crate) struct Dependency {
     /// `package = "..."`; otherwise omitted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) package: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) registry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) registry_index: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) git: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) tag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) rev: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) workspace_inherited: bool,
     pub(crate) kind: DependencyKind,
     /// Version requirement string from Cargo.toml, e.g. `"^1.0"`, `"=0.4.2"`,
     /// `"*"`. `None` for path/git-only deps with no version.
@@ -105,14 +122,50 @@ fn collect_section(
 ) {
     let Some(section) = section else { return };
     for (name, dep) in section {
-        let (req, optional, default_features, features, package) = match dep {
-            ManifestDep::Simple(req) => (Some(req.clone()), false, true, Vec::new(), None),
+        let (
+            req,
+            optional,
+            default_features,
+            features,
+            package,
+            registry,
+            registry_index,
+            path,
+            git,
+            branch,
+            tag,
+            rev,
+            workspace_inherited,
+        ) = match dep {
+            ManifestDep::Simple(req) => (
+                Some(req.clone()),
+                false,
+                true,
+                Vec::new(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+            ),
             ManifestDep::Detailed(d) => (
                 d.version.clone(),
                 d.optional.unwrap_or(false),
                 d.default_features.unwrap_or(true),
                 d.features.clone().unwrap_or_default(),
                 d.package.clone(),
+                d.registry.clone(),
+                d.registry_index.clone(),
+                d.path.clone(),
+                d.git.clone(),
+                d.branch.clone(),
+                d.tag.clone(),
+                d.rev.clone(),
+                false,
             ),
             // Inherited from workspace — we only have the local crate's
             // Cargo.toml, so we can't resolve the inherited fields. Surface
@@ -123,11 +176,27 @@ fn collect_section(
                 true,
                 i.features.clone().unwrap_or_default(),
                 None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                true,
             ),
         };
         out.push(Dependency {
             name: name.clone(),
             package,
+            registry,
+            registry_index,
+            path,
+            git,
+            branch,
+            tag,
+            rev,
+            workspace_inherited,
             kind,
             req,
             optional,
