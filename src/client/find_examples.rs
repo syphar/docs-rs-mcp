@@ -70,6 +70,8 @@ pub(crate) async fn find_examples(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
     use crate::test_utils::test_env;
 
@@ -114,7 +116,7 @@ mod tests {
         assert_eq!(iris.name, "iris");
         assert!(iris.path.ends_with("/examples/iris.rs"));
         assert!(
-            std::path::Path::new(&iris.path).is_absolute(),
+            Path::new(&iris.path).is_absolute(),
             "path should be absolute so the AI can read it directly"
         );
         assert!(iris.content.is_none(), "content omitted by default");

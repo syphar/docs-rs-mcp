@@ -1,3 +1,5 @@
+use std::{env, process};
+
 use crate::{
     context::{Config, Context},
     server::DocsServer,
@@ -56,7 +58,7 @@ const ENV_NAME: &str = "DOCS_RS_MCP_LOG";
 /// Returns the OTLP tracer provider (when configured) so the caller can flush
 /// and shut it down cleanly on exit.
 fn init_tracing(config: &Config) -> Result<Option<SdkTracerProvider>> {
-    let pid = std::process::id();
+    let pid = process::id();
     let file_appender = rolling::Builder::new()
         .rotation(rolling::Rotation::DAILY)
         .filename_prefix(format!("{APP_NAME}.{pid}"))
@@ -163,7 +165,7 @@ async fn main() -> Result<()> {
     let otel_provider = init_tracing(&config)?;
 
     info!(
-        cwd = std::env::current_dir()
+        cwd = env::current_dir()
             .map(|cwd| cwd.display().to_string())
             .ok(),
         mcp_version = env!("CARGO_PKG_VERSION"),

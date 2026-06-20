@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use reqwest::Url;
 use rmcp::ErrorData;
-use std::sync::Arc;
+use std::{io, sync::Arc};
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum Error {
@@ -27,7 +27,7 @@ pub(crate) enum Error {
     Http(#[from] reqwest::Error),
 
     #[error("i/o error")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
 
     #[error("other error: {0}")]
     Other(anyhow::Error),

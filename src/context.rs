@@ -6,7 +6,7 @@ use moka::future::Cache;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
-use std::{num, path::PathBuf, sync::Arc, time::Duration};
+use std::{fmt, num, path::PathBuf, sync::Arc, time::Duration};
 use tokio::fs;
 
 #[derive(PartialEq, Eq, Hash)]
@@ -101,8 +101,8 @@ pub(crate) struct Config {
     pub(crate) opentelemetry_grpc_endpoint: Option<Url>,
 }
 
-impl std::fmt::Debug for Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
             .field("cache_dir", &self.cache_dir.display())
             .field("log_dir", &self.log_dir.display())

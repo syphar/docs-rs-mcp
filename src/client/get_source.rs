@@ -62,7 +62,9 @@ async fn extract_source(path: impl AsRef<Path>, name: &str, version: &str) -> Re
     debug!("unpacking crate archive");
 
     spawn_blocking(move || -> Result<PathBuf> {
-        std::fs::create_dir_all(&output_dir)?;
+        use std::fs;
+
+        fs::create_dir_all(&output_dir)?;
 
         let tar_gz = File::open(&path)
             .with_context(|| format!("opening crate archive {}", path.display()))?;

@@ -22,8 +22,10 @@ async fn read_format_version_from_rustdoc_json(path: impl AsRef<Path>) -> Result
 
     let path = path.as_ref().to_path_buf();
     spawn_blocking(move || {
-        let file = std::fs::File::open(&path)?;
-        let reader = std::io::BufReader::new(file);
+        use std::{fs, io};
+
+        let file = fs::File::open(&path)?;
+        let reader = io::BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::new(reader)?;
 
         let rustdoc_json: RustdocJson = serde_json::from_reader(decoder)?;
@@ -141,8 +143,10 @@ pub(crate) async fn get_docs(
 pub(crate) async fn parse_rustdoc_json(path: impl AsRef<Path>) -> Result<rustdoc_types::Crate> {
     let path = path.as_ref().to_path_buf();
     spawn_blocking(move || {
-        let file = std::fs::File::open(&path)?;
-        let reader = std::io::BufReader::new(file);
+        use std::{fs, io};
+
+        let file = fs::File::open(&path)?;
+        let reader = io::BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::new(reader)?;
 
         Ok(serde_json::from_reader(decoder)?)
