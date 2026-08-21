@@ -1,5 +1,8 @@
-List `.rs` files under the crate's `examples/` directory. Many crates publish runnable examples here — real working code is often more useful than doctest fragments.
+Find runnable Rust examples published under a crate release's `examples/` directory.
+Prefer this for working examples; use `get_item` when doctests for a specific API item
+are more relevant.
 
-Each row: `{path, name, content?}`. `name` is the file stem (or directory name for multi-file examples). `content` is only included when `include_content=true`.
-
-Use this for *"show me how to use this crate"* / *"are there full working examples?"* — preferable to extracting doctests when the crate ships proper examples.
+Returns `{examples: [{path, name, required_features, content?}]}`. Source is included
+only when `include_content=true`. An empty `examples` array means the crate published
+no example files. Requires an exact version and returns an error when the release
+archive cannot be fetched or parsed.

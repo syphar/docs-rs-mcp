@@ -1,5 +1,7 @@
-Return the crate's README content from its published source archive. Uses `package.readme` from `Cargo.toml` when present, otherwise tries common root filenames such as `README.md`, `README.markdown`, `README.txt`, `README.rst`, and `README`.
+Return the README published with one exact crate release. Use for crate-authored setup,
+usage, and introductory guidance; use `find_examples` for runnable examples and
+rustdoc-backed tools for precise API details.
 
-Each result has `{source_file, content}`.
-
-Use this for *"show me the README"*, *"how does this crate say to get started?"*, *"what setup instructions does the README give?"*, or broad usage questions where package metadata is too terse and full examples may not exist.
+Returns `{source_file, content}`. Returns a resource-not-found error when the manifest
+and common README filenames identify no README, or another error when the release
+archive cannot be fetched or parsed.

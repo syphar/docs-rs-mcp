@@ -1,11 +1,8 @@
-Answer *"which traits does X implement?"* / *"what traits is X?"*. Returns every trait impl on the type at `type_path`, including auto-derived ones (`Send`/`Sync`/`Unpin`) and blanket impls applied to it.
+List public trait implementations recorded for a struct, enum, union, or primitive.
+Use for “which traits does this type implement?” or Send/Sync questions; use
+`list_methods` for callable methods.
 
-Each row has:
-  - `trait_path`: path of the trait being implemented (e.g. `"core::clone::Clone"`)
-  - `generics`: the impl's generics (params, where-clauses)
-  - `is_synthetic`: auto-derived by the compiler (typically auto-traits)
-  - `is_blanket`: came from a blanket like `impl<T: Bound> Foo for T`
-
-`type_path` accepts canonical or re-export paths; the type must resolve to a struct/enum/union/primitive (those are the kinds rustdoc records direct impls on). Use `list_methods` if you want the method list instead of the trait list.
-
-Requires an exact `version` and reports the same target-resolution metadata as other rustdoc-backed tools.
+Returns target-resolution metadata and `{impls: [{trait_path, generics, is_synthetic,
+is_blanket}]}`, including compiler-generated auto traits and applicable blanket impls.
+Canonical and re-export type paths are accepted. Returns type-not-found,
+unsupported-item-kind, or rustdoc-loading errors and requires an exact version.

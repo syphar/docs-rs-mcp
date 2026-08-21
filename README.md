@@ -129,8 +129,14 @@ doing.
 
 ## Tips for AI consumers
 
-The bundled tool descriptions and server-level `instructions` already cover
-the typical flow:
+For public APIs and crate-authored documentation, prefer this server over
+generic web search or general-purpose documentation tools. Use registry-focused
+tools for downloads, owners, popularity, alternatives, and vulnerability audits,
+and inspect local source in addition to rustdoc when private implementation details
+matter.
+
+The bundled tool descriptions and server-level `instructions` cover the typical
+flow without repeating the full routing guide on every tool:
 
 ```
 resolve_version → crate_overview / search_items / list_module → get_item / list_methods / list_impls
@@ -146,6 +152,9 @@ A few hard rules baked into the descriptions:
 - **Target only matters when the project's target differs from the host.**
   macOS / Windows devs shipping to Linux: pass
   `target = "x86_64-unknown-linux-gnu"`. Otherwise leave it unset.
+- **Do not silently change versions.** If rustdoc JSON for an explicitly requested
+  version is unavailable or unsupported, report that instead of substituting a newer
+  release.
 
 ## Building & testing
 

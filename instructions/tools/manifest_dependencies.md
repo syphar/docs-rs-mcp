@@ -1,3 +1,8 @@
-Dependencies declared in a crate's manifest (one level, not transitive). Useful for *"what does this crate directly depend on?"* / *"is X declared as a dependency of Y?"*. Reads `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`, and target-gated sections from `Cargo.toml`.
+Return dependencies declared directly in one exact crate release's `Cargo.toml`. Use
+for manifest dependency questions—not for a resolved or transitive dependency graph.
 
-Each row: `{name, kind: "normal"|"dev"|"build", req, optional, default_features, features, target?}`. `target` is set when the dependency is gated under `[target.'cfg(...)'.dependencies]`.
+Returns `{dependencies: [{name, package?, kind, req?, optional, default_features,
+features, target?}]}` across normal, development, build, and target-gated sections.
+`package` identifies the actual crate for renamed dependencies; `kind` is `normal`,
+`dev`, or `build`. Returns an error when the release manifest cannot be fetched or
+parsed.

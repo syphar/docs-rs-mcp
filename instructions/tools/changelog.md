@@ -1,5 +1,9 @@
-Return the crate's changelog content. Tries common filenames (`CHANGELOG.md`, `CHANGES.md`, `HISTORY.md`, `NEWS.md`, and their extensionless variants) and returns the first that exists.
+Return a crate release's changelog from its published source archive. Use for questions
+about changes, breaking changes, or whether a changelog exists—not for public API
+signatures.
 
-When `section_version` is provided, returns only the heading section that mentions that version string — best-effort heuristic against markdown heading syntax. Omit it for the full changelog.
-
-Use this for *"what changed in 1.4?"* / *"any breaking changes between 0.7 and 0.8?"* / *"is there a CHANGELOG?"*.
+Returns `{source_file, releases: [{version, title, notes}]}`. With
+`section_version`, `releases` contains only the matching parsed section; otherwise it
+contains all parsed releases. Returns a resource-not-found error when no common
+changelog filename or requested version section exists. Requires an exact crate
+version.

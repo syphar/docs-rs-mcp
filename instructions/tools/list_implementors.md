@@ -1,10 +1,8 @@
-Answer *"what implements this trait?"* / *"which types are X?"*. The inverse of `list_impls`. Returns every type that implements the trait at `trait_path` *within this crate's rustdoc JSON*.
+List types that implement a public trait within one crate's rustdoc JSON. Use for “what
+implements this trait?”; use `list_impls` for the inverse question about one type.
 
-Each row has:
-  - `type_path`: rendered path of the implementing type when it's a simple resolved path (e.g. `"alloc::vec::Vec"`); omitted for complex types like `&T`, tuples, or function pointers — inspect `for_type` then
-  - `for_type`: full structured rustdoc representation of the implementing type
-  - `generics`: the impl's generics
-
-Limitation: rustdoc JSON is single-crate. Implementations in *other* crates (e.g. a downstream crate implementing this trait on its own type) are not visible here. To find those you'd have to search those crates explicitly.
-
-Requires an exact `version` and reports the same target-resolution metadata as other rustdoc-backed tools.
+Returns target-resolution metadata and `{implementors: [{type_path?, for_type,
+generics}]}`. `type_path` is omitted for complex types; `for_type` always contains the
+structured type. Results cannot include implementations defined only in downstream or
+unrelated crates. Returns trait-not-found or rustdoc-loading errors and requires an
+exact version.

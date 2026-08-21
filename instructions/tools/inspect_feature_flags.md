@@ -1,7 +1,7 @@
-Answer *"how do I enable feature X?"*, *"what features does this crate have?"*, *"does this crate need `tokio/macros`?"*. Reads the `[features]` section from the crate's `Cargo.toml`.
+Return Cargo feature flags declared by one exact crate version. Use for questions about
+available features, default features, optional dependencies, or how to enable a feature.
 
-Each row is `{name, enables, default}`:
-  - `enables`: the verbatim entries Cargo will activate (other features, `dep:foo` syntax for optional deps, `foo/bar` for transitive feature activation).
-  - `default`: true when this feature is in the crate's `default` feature set.
-
-Requires an exact `version` (the published Cargo.toml on crates.io for that release).
+Returns `{features: [{name, enables, default}]}`. `enables` contains the manifest's
+verbatim feature activations. Returns an error when the release manifest cannot be
+fetched or parsed. This reports declarations, not which features the current project
+actually enabled.

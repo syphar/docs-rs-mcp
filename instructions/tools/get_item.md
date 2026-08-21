@@ -1,14 +1,10 @@
-Return the full record for a single item by its fully-qualified path. Requires an exact version — call `resolve_version` first if you only have a semver requirement.
+Return one rustdoc item by fully-qualified canonical or re-export path. Use for a
+specific item's signature, documentation, fields, variants, deprecation status, or
+doctest examples—not for discovering an unknown path.
 
-`path` accepts either canonical or re-export paths (e.g. `"axum::Router"` resolves to its canonical `"axum::routing::Router"`); the `path` field on the result is always the canonical path. Returns the same `target` defaulting and fallback semantics as `search_items` / `list_module`.
-
-The response includes target-resolution metadata plus an `item` containing:
-  - `kind`, `name`, `path`, `id`
-  - `inner`: structured rustdoc info (signature, generics, where-clauses, fields/variants/function decl, etc.); shape varies by `kind`
-  - `deprecation`, `span`, `attrs`
-
-`verbosity` controls how much detail to return (default `"full"`):
-  - `"signature"`: signature only (the structured `inner`). Cheap.
-  - `"full"`: signature + raw `docs` + `examples` (Rust fenced code blocks extracted from the doc string). Blocks tagged with non-Rust languages are skipped; rustdoc attributes like `ignore`, `no_run`, `compile_fail`, `editionXXXX` are treated as Rust. Hidden doctest lines (starting with `#`) are kept verbatim — strip or substitute as needed.
-
-Follow-ups: when the item is a struct/enum/union, call `list_methods` on the same path to see its methods. When it's a module, call `list_module` to enumerate its children. When it's a trait, `list_methods` on a concrete type that implements it shows which methods are inherited; `get_item` on the trait itself shows the trait's required/default methods inside `inner`.
+Returns target-resolution metadata and `{item: {kind, name, path, id, inner,
+deprecation, span, attrs, docs?, examples?}}`; `inner` is structured rustdoc data whose
+shape depends on item kind. `verbosity="signature"` omits docs and examples;
+`verbosity="full"` includes them. Re-export paths resolve to the canonical result path.
+Returns item-not-found or rustdoc-loading errors. Requires an exact version; use
+`search_items` first when the path is uncertain.

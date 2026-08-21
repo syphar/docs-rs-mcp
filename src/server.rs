@@ -191,4 +191,31 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn instructions_are_concise_for_tool_discovery() {
+        const MAX_SERVER_WORDS: usize = 150;
+        const MAX_TOOL_WORDS: usize = 150;
+
+        let server_instructions = include_str!("../instructions/server.md");
+        assert!(
+            server_instructions.split_whitespace().count() <= MAX_SERVER_WORDS,
+            "server instructions exceed {MAX_SERVER_WORDS} words"
+        );
+
+        for tool in DocsServer::tool_router().list_all() {
+            let description = tool.description.unwrap();
+            let words = description.split_whitespace().count();
+            assert!(
+                words <= MAX_TOOL_WORDS,
+                "tool {} description has {words} words; maximum is {MAX_TOOL_WORDS}",
+                tool.name
+            );
+            assert!(
+                description.contains("Return") || description.contains("Returns"),
+                "tool {} description does not state its return contract",
+                tool.name
+            );
+        }
+    }
 }

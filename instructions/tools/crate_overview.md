@@ -1,3 +1,9 @@
-Compact first-pass orientation for one exact crate version. Combines package metadata, target resolution, features enabled by default, unconditional direct runtime dependencies, public root modules, and the first 4,000 README characters.
+Give a compact first-pass orientation to an unfamiliar crate at one exact version.
+Prefer this for broad questions such as “what does this crate provide?” before drilling
+into individual API items.
 
-Use this before deeper exploration of an unfamiliar crate. Follow up with `list_module`, `search_items`, `get_item`, `inspect_feature_flags`, or `manifest_dependencies` when the compact overview is insufficient.
+Returns target-resolution metadata, package metadata, default features, unconditional
+direct runtime dependencies, public root modules, and up to 4,000 README characters.
+The README may be absent. Follow with `search_items`, `list_module`, `get_item`, or
+`list_methods` for API details. Rustdoc-unavailable and source-fetch failures are
+reported as errors.

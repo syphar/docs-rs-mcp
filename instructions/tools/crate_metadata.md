@@ -1,5 +1,7 @@
-Quick orientation for a crate: name, version, description, repository, homepage, license, documentation URL, MSRV (`rust-version`), edition, authors, keywords, categories. Reads the `[package]` section from the crate's `Cargo.toml` on crates.io.
+Return package metadata for one exact crate version from its published `Cargo.toml`.
+Use for description, repository, homepage, license, documentation URL, MSRV, edition,
+authors, keywords, or categories—not for API items or version resolution.
 
-Use this when the user asks *"what is this crate?"* / *"who maintains it?"* / *"what's the MSRV?"* / *"what license?"*.
-
-NOT for *"what version is X?"* / *"latest X"* / *"X 0.8"* — this tool needs a fully-specified exact version (e.g. `"1.2.3"`) and won't accept `"*"`, `"0.8"`, `"^1.0"`, or any range. Call `resolve_version` first to turn any non-exact requirement into a concrete version, then pass that here.
+Returns the package metadata fields as structured JSON. Call `resolve_version` first
+unless the version is fully specified. Returns an error when the crate release or its
+manifest cannot be fetched or parsed.
